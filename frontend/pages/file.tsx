@@ -11,17 +11,18 @@ export default function FileResultsPage() {
   const { datasetId, fileId } = router.query;
   const datasetKey = Array.isArray(datasetId) ? datasetId[0] : datasetId;
   const fileKey = Array.isArray(fileId) ? fileId[0] : fileId;
-  const { isAuthenticated, accessToken, loading } = useAuth();
+  const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [file, setFile] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
   const [qualityReport, setQualityReport] = useState<any>(null);
   const [error, setError] = useState('');
 
   const loadFile = async () => {
-    if (!datasetKey || !fileKey || !accessToken) return;
+    const token = idToken || accessToken;
+    if (!datasetKey || !fileKey || !token) return;
     const result = await apiRequest<{ file: any; job: any }>(
       `/datasets/${datasetKey}/files/${fileKey}`,
-      { accessToken }
+      { accessToken: token }
     );
     setFile(result.file);
     setJob(result.job);
@@ -37,15 +38,16 @@ export default function FileResultsPage() {
     if (isAuthenticated && datasetKey && fileKey) {
       loadFile().catch(() => setError('Failed to load file results.'));
     }
-  }, [isAuthenticated, datasetKey, fileKey, accessToken]);
+  }, [isAuthenticated, datasetKey, fileKey, idToken, accessToken]);
 
   useEffect(() => {
     const loadQualityReport = async () => {
-      if (!datasetKey || !fileKey || !job?.jobId || !accessToken) return;
+      const token = idToken || accessToken;
+      if (!datasetKey || !fileKey || !job?.jobId || !token) return;
       if (job.status !== 'COMPLETE') return;
       const { url } = await apiRequest<{ url: string }>(
         `/datasets/${datasetKey}/files/${fileKey}/jobs/${job.jobId}/download?type=quality`,
-        { accessToken }
+        { accessToken: token }
       );
       const response = await fetch(url);
       const report = await response.json();
@@ -53,7 +55,7 @@ export default function FileResultsPage() {
     };
 
     loadQualityReport().catch(() => undefined);
-  }, [job?.jobId, job?.status, datasetKey, fileKey, accessToken]);
+  }, [job?.jobId, job?.status, datasetKey, fileKey, idToken, accessToken]);
 
   const groupedFindings = useMemo(() => {
     const findings = qualityReport?.findings || [];
@@ -67,10 +69,11 @@ export default function FileResultsPage() {
   }, [qualityReport]);
 
   const downloadArtifact = async (type: string) => {
-    if (!datasetKey || !fileKey || !job?.jobId || !accessToken) return;
+    const token = idToken || accessToken;
+    if (!datasetKey || !fileKey || !job?.jobId || !token) return;
     const result = await apiRequest<{ url: string }>(
       `/datasets/${datasetKey}/files/${fileKey}/jobs/${job.jobId}/download?type=${type}`,
-      { accessToken }
+      { accessToken: token }
     );
     window.open(result.url, '_blank');
   };

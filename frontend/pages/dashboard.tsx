@@ -6,14 +6,15 @@ import { NavBar } from '../components/NavBar';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { isAuthenticated, accessToken, loading } = useAuth();
+  const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [datasets, setDatasets] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
   const loadDatasets = async () => {
-    if (!accessToken) return;
-    const result = await apiRequest<{ datasets: any[] }>('/datasets', { accessToken });
+    const token = idToken || accessToken;
+    if (!token) return;
+    const result = await apiRequest<{ datasets: any[] }>('/datasets', { accessToken: token });
     setDatasets(result.datasets || []);
   };
 
@@ -27,14 +28,15 @@ export default function DashboardPage() {
     if (isAuthenticated) {
       loadDatasets().catch(() => setError('Failed to load datasets.'));
     }
-  }, [isAuthenticated, accessToken]);
+  }, [isAuthenticated, idToken, accessToken]);
 
   const createDataset = async () => {
-    if (!name.trim() || !accessToken) return;
+    const token = idToken || accessToken;
+    if (!name.trim() || !token) return;
     try {
       await apiRequest('/datasets', {
         method: 'POST',
-        accessToken,
+        accessToken: token,
         body: { name }
       });
       setName('');

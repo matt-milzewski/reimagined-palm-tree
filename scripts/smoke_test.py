@@ -7,6 +7,7 @@ import urllib.request
 import urllib.error
 
 import boto3
+from botocore.exceptions import ClientError
 
 
 def build_sample_pdf() -> bytes:
@@ -16,7 +17,9 @@ def build_sample_pdf() -> bytes:
     objects.append(
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> >>"
     )
-    stream_data = b"BT /F1 24 Tf 72 72 Td (Hello RAG) Tj ET"
+    text = "Hello RAG readiness pipeline. " * 8
+    text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream_data = f"BT /F1 12 Tf 72 72 Td ({text}) Tj ET".encode("utf-8")
     obj4 = b"<< /Length " + str(len(stream_data)).encode("utf-8") + b" >>\nstream\n" + stream_data + b"\nendstream"
     objects.append(obj4)
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
@@ -53,6 +56,7 @@ def api_request(method, url, token=None, payload=None):
 def upload_to_presigned(url, payload: bytes):
     request = urllib.request.Request(url, data=payload, method="PUT")
     request.add_header("Content-Type", "application/pdf")
+    request.add_header("x-amz-server-side-encryption", "AES256")
     with urllib.request.urlopen(request) as response:
         response.read()
 
@@ -69,16 +73,35 @@ def main():
 
     api_base = api_base.rstrip("/")
     cognito = boto3.client("cognito-idp", region_name=region)
-    auth = cognito.initiate_auth(
-        ClientId=client_id,
-        AuthFlow="USER_PASSWORD_AUTH",
-        AuthParameters={"USERNAME": email, "PASSWORD": password}
-    )
+    try:
+        auth = cognito.initiate_auth(
+            ClientId=client_id,
+            AuthFlow="USER_PASSWORD_AUTH",
+            AuthParameters={"USERNAME": email, "PASSWORD": password}
+        )
+    except ClientError as error:
+        message = error.response.get("Error", {}).get("Message", str(error))
+        raise SystemExit(f"Auth failed: {message}")
 
-    token = auth["AuthenticationResult"]["AccessToken"]
+    if "AuthenticationResult" not in auth:
+        if auth.get("ChallengeName") == "NEW_PASSWORD_REQUIRED":
+            auth = cognito.respond_to_auth_challenge(
+                ClientId=client_id,
+                ChallengeName="NEW_PASSWORD_REQUIRED",
+                Session=auth.get("Session"),
+                ChallengeResponses={"USERNAME": email, "NEW_PASSWORD": password}
+            )
+        else:
+            raise SystemExit(f"Unexpected auth challenge: {auth.get('ChallengeName')}")
+
+    result = auth["AuthenticationResult"]
+    token = result.get("IdToken") or result.get("AccessToken")
+    if not token:
+        raise SystemExit("Auth failed: missing token in authentication result.")
 
     dataset = api_request("POST", f"{api_base}/datasets", token=token, payload={"name": "Smoke Test"})
     dataset_id = dataset["datasetId"]
+    print("Dataset:", dataset_id)
 
     presign = api_request(
         "POST",
@@ -87,12 +110,14 @@ def main():
         payload={"filename": "sample.pdf", "contentType": "application/pdf"}
     )
 
+    file_id = presign["fileId"]
+    print("File:", file_id)
     upload_to_presigned(presign["uploadUrl"], build_sample_pdf())
 
     job_id = None
     status = None
     for _ in range(30):
-        file_info = api_request("GET", f"{api_base}/datasets/{dataset_id}/files/{presign['fileId']}", token=token)
+        file_info = api_request("GET", f"{api_base}/datasets/{dataset_id}/files/{file_id}", token=token)
         job = file_info.get("job")
         status = file_info.get("file", {}).get("status")
         if job:
@@ -101,12 +126,21 @@ def main():
             break
         time.sleep(5)
 
+    if status == "FAILED" and job_id:
+        job_details = api_request(
+            "GET",
+            f"{api_base}/datasets/{dataset_id}/files/{file_id}/jobs/{job_id}",
+            token=token
+        )
+        error_message = job_details.get("job", {}).get("errorMessage")
+        raise SystemExit(f"Job failed: {error_message or 'Unknown error'}")
+
     if status != "COMPLETE" or not job_id:
         raise SystemExit(f"Job did not complete. Status: {status}")
 
     download = api_request(
         "GET",
-        f"{api_base}/datasets/{dataset_id}/files/{presign['fileId']}/jobs/{job_id}/download?type=quality",
+        f"{api_base}/datasets/{dataset_id}/files/{file_id}/jobs/{job_id}/download?type=quality",
         token=token
     )
 

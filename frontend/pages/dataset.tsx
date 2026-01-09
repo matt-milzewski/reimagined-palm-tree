@@ -14,14 +14,15 @@ export default function DatasetPage() {
   const router = useRouter();
   const { datasetId } = router.query;
   const datasetKey = Array.isArray(datasetId) ? datasetId[0] : datasetId;
-  const { isAuthenticated, accessToken, loading } = useAuth();
+  const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [files, setFiles] = useState<any[]>([]);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [error, setError] = useState('');
 
   const loadFiles = async () => {
-    if (!datasetKey || !accessToken) return;
-    const result = await apiRequest<{ files: any[] }>(`/datasets/${datasetKey}/files`, { accessToken });
+    const token = idToken || accessToken;
+    if (!datasetKey || !token) return;
+    const result = await apiRequest<{ files: any[] }>(`/datasets/${datasetKey}/files`, { accessToken: token });
     setFiles(result.files || []);
   };
 
@@ -35,7 +36,7 @@ export default function DatasetPage() {
     if (isAuthenticated && datasetKey) {
       loadFiles().catch(() => setError('Failed to load files.'));
     }
-  }, [isAuthenticated, datasetKey, accessToken]);
+  }, [isAuthenticated, datasetKey, idToken, accessToken]);
 
   const pollingNeeded = useMemo(
     () => files.some((file) => ['UPLOADED_PENDING', 'PROCESSING'].includes(file.status)),
@@ -48,15 +49,16 @@ export default function DatasetPage() {
       loadFiles().catch(() => undefined);
     }, 5000);
     return () => clearInterval(interval);
-  }, [pollingNeeded, datasetKey, accessToken]);
+  }, [pollingNeeded, datasetKey, idToken, accessToken]);
 
   const uploadFile = async (file: File) => {
-    if (!datasetKey || !accessToken) return;
+    const token = idToken || accessToken;
+    if (!datasetKey || !token) return;
     const presign = await apiRequest<{ fileId: string; uploadUrl: string }>(
       `/datasets/${datasetKey}/files/presign`,
       {
         method: 'POST',
-        accessToken,
+        accessToken: token,
         body: { filename: file.name, contentType: file.type || 'application/pdf' }
       }
     );
@@ -65,6 +67,7 @@ export default function DatasetPage() {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', presign.uploadUrl);
       xhr.setRequestHeader('Content-Type', file.type || 'application/pdf');
+      xhr.setRequestHeader('x-amz-server-side-encryption', 'AES256');
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const progress = Math.round((event.loaded / event.total) * 100);
