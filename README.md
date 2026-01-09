@@ -31,7 +31,7 @@ npm run install:all
 ```
 cd infra
 npm run cdk bootstrap
-npm run cdk deploy --all
+npm run cdk deploy --all --require-approval never
 ```
 
 Take note of the CDK outputs:

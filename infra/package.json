@@ -6,16 +6,16 @@
     "build": "tsc",
     "watch": "tsc -w",
     "cdk": "cdk",
-    "deploy": "cdk deploy --all"
+    "deploy": "cdk deploy --all --require-approval never"
   },
   "dependencies": {
-    "@aws-cdk/aws-lambda-nodejs": "^2.130.0",
-    "@aws-cdk/aws-lambda-python-alpha": "^2.130.0-alpha.0",
-    "aws-cdk-lib": "^2.130.0",
+    "@aws-cdk/aws-lambda-python-alpha": "^2.234.0-alpha.0",
+    "aws-cdk-lib": "^2.234.0",
     "constructs": "^10.3.0",
     "source-map-support": "^0.5.21"
   },
   "devDependencies": {
+    "aws-cdk": "^2.1100.0",
     "esbuild": "^0.20.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"

@@ -1,0 +1,11 @@
+node_modules/
+**/node_modules/
+dist/
+cdk.out/
+.env.local
+frontend/.next/
+frontend/out/
+backend/pipeline/.pytest_cache/
+backend/pipeline/__pycache__/
+**/__pycache__/
+*.pyc
