@@ -1,0 +1,17 @@
+{
+  "name": "rag-readiness-pipeline",
+  "private": true,
+  "workspaces": [
+    "infra",
+    "frontend",
+    "backend/api"
+  ],
+  "scripts": {
+    "install:all": "npm --prefix infra install && npm --prefix frontend install && npm --prefix backend/api install",
+    "deploy": "npm --prefix infra run cdk deploy --all",
+    "build:frontend": "npm --prefix frontend run build",
+    "export:frontend": "npm --prefix frontend run export",
+    "deploy:frontend": "./scripts/deploy_frontend.sh",
+    "seed": "node scripts/seed.js"
+  }
+}

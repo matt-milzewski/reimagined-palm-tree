@@ -1,0 +1,19 @@
+{
+  "name": "rag-readiness-api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.540.0",
+    "@aws-sdk/lib-dynamodb": "^3.540.0",
+    "@aws-sdk/client-s3": "^3.540.0",
+    "@aws-sdk/s3-request-presigner": "^3.540.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.137",
+    "typescript": "^5.4.5"
+  }
+}
