@@ -40,6 +40,14 @@ def build_sample_pdf() -> bytes:
     return pdf
 
 
+def load_pdf_payload() -> tuple[bytes, str]:
+    path = os.environ.get("SMOKE_TEST_PDF", "Resume-5.pdf")
+    if path and os.path.isfile(path):
+        with open(path, "rb") as handle:
+            return handle.read(), path
+    return build_sample_pdf(), "generated sample"
+
+
 def api_request(method, url, token=None, payload=None):
     data = None
     if payload is not None:
@@ -112,7 +120,9 @@ def main():
 
     file_id = presign["fileId"]
     print("File:", file_id)
-    upload_to_presigned(presign["uploadUrl"], build_sample_pdf())
+    pdf_payload, pdf_label = load_pdf_payload()
+    print("Using PDF:", pdf_label)
+    upload_to_presigned(presign["uploadUrl"], pdf_payload)
 
     job_id = None
     status = None

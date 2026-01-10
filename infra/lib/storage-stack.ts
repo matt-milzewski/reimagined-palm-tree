@@ -21,7 +21,15 @@ export class StorageStack extends cdk.Stack {
     this.rawBucket = new s3.Bucket(this, 'RawBucket', {
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true
+      enforceSSL: true,
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST, s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedOrigins: ['*'],
+          allowedHeaders: ['*'],
+          exposedHeaders: ['ETag']
+        }
+      ]
     });
 
     this.processedBucket = new s3.Bucket(this, 'ProcessedBucket', {
