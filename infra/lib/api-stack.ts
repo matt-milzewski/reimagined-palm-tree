@@ -52,7 +52,10 @@ export class ApiStack extends cdk.Stack {
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-        resources: [`arn:aws:ses:${this.region}:${this.account}:identity/${contactFromEmail}`]
+        resources: [
+          `arn:aws:ses:${this.region}:${this.account}:identity/${contactFromEmail}`,
+          `arn:aws:ses:${this.region}:${this.account}:configuration-set/*`
+        ]
       })
     );
 
