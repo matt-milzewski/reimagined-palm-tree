@@ -28,7 +28,7 @@ export default function DatasetPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/');
+      router.push('/login');
     }
   }, [loading, isAuthenticated, router]);
 

@@ -30,7 +30,7 @@ export default function FileResultsPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/');
+      router.push('/login');
     }
   }, [loading, isAuthenticated, router]);
 

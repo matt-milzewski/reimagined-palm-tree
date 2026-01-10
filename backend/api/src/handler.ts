@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ddb } from '../../shared/ddb';
 import { getTenantContext } from '../../shared/auth';
@@ -8,6 +9,7 @@ import { log } from '../../shared/logger';
 import { newId } from '../../shared/ids';
 
 const s3 = new S3Client({});
+const ses = new SESv2Client({});
 
 const DATASETS_TABLE = process.env.DATASETS_TABLE || '';
 const FILES_TABLE = process.env.FILES_TABLE || '';
@@ -15,6 +17,8 @@ const JOBS_TABLE = process.env.JOBS_TABLE || '';
 const AUDIT_TABLE = process.env.AUDIT_TABLE || '';
 const RAW_BUCKET = process.env.RAW_BUCKET || '';
 const PROCESSED_BUCKET = process.env.PROCESSED_BUCKET || '';
+const CONTACT_RECIPIENT_EMAIL = process.env.CONTACT_RECIPIENT_EMAIL || '';
+const CONTACT_FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,6 +45,19 @@ function parseJson(body?: string | null): any {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function getPath(event: APIGatewayProxyEvent): string {
+  if (event.pathParameters?.proxy) {
+    return `/${event.pathParameters.proxy}`;
+  }
+  const rawPath = event.path || '/';
+  const stage = event.requestContext?.stage;
+  if (stage && rawPath.startsWith(`/${stage}`)) {
+    const trimmed = rawPath.slice(stage.length + 1);
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  }
+  return rawPath;
 }
 
 async function putAudit(
@@ -286,15 +303,77 @@ async function handleDownload(
   return jsonResponse(200, { url });
 }
 
+async function handlePublicContact(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const body = parseJson(event.body);
+
+  if (!body.name || !body.email || !body.company || !body.segment || !body.goal || !body.volume) {
+    return jsonResponse(400, { message: 'Missing required fields.' });
+  }
+  if (!Array.isArray(body.storage) || body.storage.length === 0) {
+    return jsonResponse(400, { message: 'Storage selection is required.' });
+  }
+
+  const recipient = CONTACT_RECIPIENT_EMAIL || CONTACT_FROM_EMAIL;
+  const fromEmail = CONTACT_FROM_EMAIL || CONTACT_RECIPIENT_EMAIL;
+  if (!recipient || !fromEmail) {
+    log('ERROR', 'Contact email not configured');
+    return jsonResponse(500, { message: 'Contact email not configured.' });
+  }
+
+  const submittedAt = nowIso();
+  const emailBody = [
+    'New contact request',
+    `Name: ${body.name}`,
+    `Company: ${body.company}`,
+    `Email: ${body.email}`,
+    `Phone: ${body.phone || 'Not provided'}`,
+    `Segment: ${body.segment}`,
+    `Goal: ${body.goal}`,
+    `Document volume: ${body.volume}`,
+    `Storage: ${body.storage.join(', ')}`,
+    `Submitted at: ${submittedAt}`
+  ].join('\n');
+
+  await ses.send(
+    new SendEmailCommand({
+      FromEmailAddress: fromEmail,
+      Destination: { ToAddresses: [recipient] },
+      Content: {
+        Simple: {
+          Subject: { Data: 'RAG Readiness Pipeline contact request' },
+          Body: { Text: { Data: emailBody } }
+        }
+      }
+    })
+  );
+
+  log('INFO', 'Public contact submission delivered', {
+    name: body.name,
+    company: body.company,
+    email: body.email,
+    phone: body.phone,
+    segment: body.segment,
+    goal: body.goal,
+    volume: body.volume,
+    storage: body.storage,
+    submittedAt
+  });
+
+  return jsonResponse(200, { ok: true });
+}
+
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
     if (event.httpMethod === 'OPTIONS') {
       return { statusCode: 200, headers: corsHeaders, body: '' };
     }
 
-    const proxyPath = event.pathParameters?.proxy || '';
-    const path = `/${proxyPath}`;
+    const path = getPath(event);
     const method = event.httpMethod;
+
+    if (path === '/public/contact' && method === 'POST') {
+      return await handlePublicContact(event);
+    }
 
     if (path === '/me' && method === 'GET') {
       return await handleGetMe(event);
