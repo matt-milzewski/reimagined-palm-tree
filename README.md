@@ -1,13 +1,21 @@
-# RAG Readiness Pipeline MVP
+# RAG Readiness Pipeline
 
-Production-style monorepo for a complete SaaS MVP that ingests PDFs, runs a multi-step processing pipeline, and returns extracted text, normalized JSON, RAG chunks, and a quality report.
+A production style SaaS starter that ingests construction documents, cleans and normalises them, and produces RAG ready outputs. It includes a static marketing site, an authenticated app, and an automated processing pipeline on AWS.
 
-## Architecture
-- Cognito User Pool for auth (tenantId = Cognito `sub`)
-- API Gateway (REST) + Lambda (Node.js)
-- S3 raw bucket + S3 processed bucket
+## What this repo includes
+- Static marketing site at `/` plus `/contact`
+- Authenticated app at `/login` with datasets, uploads, and job status
+- S3 based upload flow using presigned URLs
+- Step Functions pipeline for extract, normalise, quality checks, chunking, and persistence
+- DynamoDB metadata tables for datasets, files, jobs, and audit events
+- CloudFront hosted frontend
+
+## Architecture at a glance
+- Cognito User Pool for auth, tenantId is the Cognito `sub`
+- API Gateway REST API + Lambda (Node.js)
+- S3 raw and processed buckets
 - SQS ingestion queue + dispatcher Lambda
-- Step Functions pipeline (Extract -> Normalize -> Quality -> Chunk -> Persist)
+- Step Functions pipeline (Extract -> Normalise -> Quality -> Chunk -> Persist)
 - DynamoDB tables for datasets, files, jobs, audit log
 - CloudFront + S3 for static Next.js export
 
@@ -22,6 +30,12 @@ Production-style monorepo for a complete SaaS MVP that ingests PDFs, runs a mult
 /scripts        Deploy + smoke test scripts
 ```
 
+## Prerequisites
+- Node.js 18+
+- Python 3.11+
+- AWS CLI configured for the target account
+- Docker Desktop running (used for Lambda bundling)
+
 ## Install dependencies
 ```
 npm run install:all
@@ -34,11 +48,11 @@ npm run cdk bootstrap
 npm run cdk deploy --all --require-approval never
 ```
 
-Take note of the CDK outputs:
+Capture the CDK outputs:
 - `ApiUrl`
 - `UserPoolId`
 - `UserPoolClientId`
-- `UserPoolDomain`
+- `UserPoolDomainName`
 - `FrontendBucketName`
 - `FrontendDistributionId`
 - `FrontendUrl`
@@ -50,13 +64,13 @@ cp frontend/.env.example frontend/.env.local
 
 Edit `frontend/.env.local`:
 ```
-NEXT_PUBLIC_REGION=us-east-1
+NEXT_PUBLIC_REGION=ap-southeast-2
 NEXT_PUBLIC_USER_POOL_ID=<from output>
 NEXT_PUBLIC_USER_POOL_CLIENT_ID=<from output>
-NEXT_PUBLIC_API_BASE_URL=<from output>
+NEXT_PUBLIC_API_BASE_URL=<from output, no trailing slash>
 ```
 
-## Build + export frontend
+## Build and export frontend
 ```
 npm run build:frontend
 npm run export:frontend
@@ -70,19 +84,37 @@ npm run deploy:frontend
 ```
 
 ## Create a user
-Self-sign-up is enabled on the Cognito User Pool. Create a user via the Cognito hosted UI or the AWS console. Use that email/password to log in to the frontend.
+Self sign up is enabled. Go to `/login`, create an account, confirm the email code, and sign in.
 
-## Run the smoke test
-The smoke test signs in, creates a dataset, uploads a sample PDF, waits for completion, and prints the readiness score.
+## Contact form email
+The contact form posts to `POST /public/contact` and sends an email using SES.
+
+By default it sends to `mattmilzewski@gmail.com`. You can override this when you deploy the API stack:
+```
+cd infra
+npm run cdk deploy RagReadinessApiStack --require-approval never \
+  -c contactRecipientEmail=you@example.com \
+  -c contactFromEmail=you@example.com
+```
+
+Make sure the sender address is verified in SES. In SES sandbox you can only send to verified addresses.
+
+## Smoke test
+The smoke test signs in, creates a dataset, uploads a PDF, waits for completion, and prints the readiness score.
 
 ```
-export AWS_REGION=us-east-1
+export AWS_REGION=ap-southeast-2
 export API_BASE_URL=<ApiUrl>
 export COGNITO_CLIENT_ID=<UserPoolClientId>
 export SMOKE_TEST_EMAIL=<existing-user-email>
 export SMOKE_TEST_PASSWORD=<user-password>
 
 python3 scripts/smoke_test.py
+```
+
+By default it uses `Resume-5.pdf` in the repo. You can override the file:
+```
+export SMOKE_TEST_PDF=/path/to/file.pdf
 ```
 
 ## Run unit tests
@@ -97,7 +129,8 @@ pytest
 API_BASE_URL=<ApiUrl> ACCESS_TOKEN=<CognitoAccessToken> npm run seed
 ```
 
-## Notes
-- The pipeline writes all artifacts into `processed/<tenantId>/<datasetId>/<fileId>/`.
-- Quality report findings are fetched in the UI via a signed download URL.
-- Hosted UI callback URLs default to `http://localhost:3000`. Update them to your CloudFront URL if you want to use Hosted UI.
+## Notes and gotchas
+- Uploaded files are stored in `raw/<tenantId>/<datasetId>/<fileId>/` and processed artifacts in `processed/<tenantId>/<datasetId>/<fileId>/`.
+- The frontend upload path includes the SSE header required by the presigned URL. If a custom client uploads directly, include `x-amz-server-side-encryption: AES256`.
+- If files stay in `UPLOADED_PENDING`, check S3 CORS on the raw bucket and confirm the upload completed.
+- Hosted UI callback URLs default to `http://localhost:3000`. Update them to your CloudFront URL if you use the hosted UI.
