@@ -17,6 +17,8 @@ jobs:
       AWS_PAGER: ""
       CONTACT_RECIPIENT_EMAIL: ${{ secrets.CONTACT_RECIPIENT_EMAIL }}
       CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+      INCLUDE_WWW: ${{ secrets.INCLUDE_WWW }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,7 +52,14 @@ jobs:
           if [ -n "${CONTACT_FROM_EMAIL}" ]; then
             CONTACT_ARGS="$CONTACT_ARGS -c contactFromEmail=${CONTACT_FROM_EMAIL}"
           fi
-          npm --prefix infra run cdk -- deploy --all --require-approval never $CONTACT_ARGS
+          DOMAIN_ARGS=""
+          if [ -n "${DOMAIN_NAME}" ]; then
+            DOMAIN_ARGS="$DOMAIN_ARGS -c domainName=${DOMAIN_NAME}"
+          fi
+          if [ -n "${INCLUDE_WWW}" ]; then
+            DOMAIN_ARGS="$DOMAIN_ARGS -c includeWww=${INCLUDE_WWW}"
+          fi
+          npm --prefix infra run cdk -- deploy --all --require-approval never $CONTACT_ARGS $DOMAIN_ARGS
 
       - name: Load frontend env
         run: |

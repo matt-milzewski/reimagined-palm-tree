@@ -99,6 +99,28 @@ npm run cdk deploy RagReadinessApiStack --require-approval never \
 
 Make sure the sender address is verified in SES. In SES sandbox you can only send to verified addresses.
 
+## Custom domain for the frontend
+The frontend stack supports a custom domain through CDK context or environment variables. This sets up:
+- ACM certificate in us-east-1 for CloudFront
+- Route53 A and AAAA alias records for the domain
+
+Deploy with context values:
+```
+cd infra
+npm run cdk deploy RagReadinessFrontendStack --require-approval never \
+  -c domainName=getragready.com \
+  -c includeWww=true
+```
+
+Or use environment variables:
+```
+export DOMAIN_NAME=getragready.com
+export INCLUDE_WWW=true
+npm --prefix infra run cdk -- deploy RagReadinessFrontendStack --require-approval never
+```
+
+Make sure the hosted zone exists in Route53 and the domain is using the Route53 name servers.
+
 ## Smoke test
 The smoke test signs in, creates a dataset, uploads a PDF, waits for completion, and prints the readiness score.
 
