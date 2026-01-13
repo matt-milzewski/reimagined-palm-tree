@@ -166,7 +166,9 @@ def main():
     }
 
     results = []
-    for attempt in range(5):
+    max_attempts = int(os.environ.get("SMOKE_TEST_QUERY_ATTEMPTS", "10"))
+    delay_seconds = int(os.environ.get("SMOKE_TEST_QUERY_DELAY", "5"))
+    for attempt in range(max_attempts):
         try:
             search = api_request("POST", f"{api_base}/rag/query", token=token, payload=query_payload)
             results = search.get("results", [])
@@ -175,7 +177,7 @@ def main():
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8")
             raise SystemExit(f"RAG query failed: {error.code} {body}") from error
-        time.sleep(3)
+        time.sleep(delay_seconds)
 
     if not results:
         raise SystemExit("RAG query returned no results.")

@@ -25,11 +25,11 @@ export class PipelineStack extends cdk.Stack {
     const embedModelId =
       this.node.tryGetContext('bedrockEmbedModelId') ||
       process.env.BEDROCK_EMBED_MODEL_ID ||
-      'amazon.titan-embed-text-v1';
+      'amazon.titan-embed-text-v2:0';
     const embeddingDimension =
       this.node.tryGetContext('embeddingDimension') ||
       process.env.EMBEDDING_DIMENSION ||
-      '1536';
+      '1024';
     const ingestBatchSize =
       this.node.tryGetContext('ingestBatchSize') ||
       process.env.INGEST_BATCH_SIZE ||
@@ -119,6 +119,12 @@ export class PipelineStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ['aoss:APIAccessAll'],
         resources: [props.vector.collectionArn]
+      })
+    );
+    vectorIngestFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['cloudwatch:PutMetricData'],
+        resources: ['*']
       })
     );
 

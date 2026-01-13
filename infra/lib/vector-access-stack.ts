@@ -12,26 +12,21 @@ export class VectorAccessStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: VectorAccessStackProps) {
     super(scope, id, props);
 
+    const accountRoot = `arn:aws:iam::${cdk.Stack.of(this).account}:root`;
     const ingestionPolicy = {
       Rules: [
         {
           ResourceType: 'collection',
           Resource: [`collection/${props.collectionName}`],
-          Permission: ['aoss:DescribeCollectionItems']
+          Permission: ['aoss:*']
         },
         {
           ResourceType: 'index',
           Resource: [`index/${props.collectionName}/*`],
-          Permission: [
-            'aoss:CreateIndex',
-            'aoss:UpdateIndex',
-            'aoss:DescribeIndex',
-            'aoss:ReadDocument',
-            'aoss:WriteDocument'
-          ]
+          Permission: ['aoss:*']
         }
       ],
-      Principal: [props.ingestionRoleArn]
+      Principal: [props.ingestionRoleArn, accountRoot]
     };
 
     const queryPolicy = {
@@ -47,7 +42,7 @@ export class VectorAccessStack extends cdk.Stack {
           Permission: ['aoss:DescribeIndex', 'aoss:ReadDocument']
         }
       ],
-      Principal: [props.queryRoleArn]
+      Principal: [props.queryRoleArn, accountRoot]
     };
 
     new opensearchserverless.CfnAccessPolicy(this, 'VectorAccessPolicy', {

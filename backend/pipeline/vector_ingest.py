@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import time
@@ -57,7 +58,11 @@ def opensearch_request(
         else:
             data = body
 
-    headers = {"host": parsed.netloc}
+    payload_hash = hashlib.sha256(data or b"").hexdigest()
+    headers = {
+        "host": parsed.netloc,
+        "x-amz-content-sha256": payload_hash
+    }
     if data is not None:
         headers["content-type"] = content_type
 
@@ -80,9 +85,23 @@ def opensearch_request(
 
 def ensure_index(endpoint: str, index_name: str, dimension: int) -> None:
     head = opensearch_request(endpoint, "HEAD", f"/{index_name}", raise_on_error=False)
+    recreate = False
     if head["status"] == 200:
-        return
-    if head["status"] not in (404, 400):
+        mapping = opensearch_request(endpoint, "GET", f"/{index_name}/_mapping", raise_on_error=False)
+        if mapping["status"] == 200 and mapping.get("body"):
+            payload = json.loads(mapping["body"])
+            index_mapping = payload.get(index_name, {})
+            properties = index_mapping.get("mappings", {}).get("properties", {})
+            vector_field = properties.get("vector", {})
+            existing_dimension = vector_field.get("dimension")
+            if existing_dimension and existing_dimension != dimension:
+                opensearch_request(endpoint, "DELETE", f"/{index_name}")
+                recreate = True
+            else:
+                return
+        else:
+            return
+    if head["status"] not in (404, 400) and not recreate:
         raise Exception(f"Unexpected OpenSearch index check status {head['status']}")
 
     mapping = {
@@ -122,7 +141,15 @@ def delete_existing_doc(endpoint: str, index_name: str, tenant_id: str, dataset_
             }
         }
     }
-    opensearch_request(endpoint, "POST", f"/{index_name}/_delete_by_query?refresh=true", body=query)
+    response = opensearch_request(
+        endpoint,
+        "POST",
+        f"/{index_name}/_delete_by_query",
+        body=query,
+        raise_on_error=False
+    )
+    if response["status"] >= 300 and response["status"] != 404:
+        raise Exception(f"OpenSearch delete_by_query failed ({response['status']}): {response.get('body')}")
 
 
 def read_chunks(bucket: str, key: str) -> Iterable[Dict]:
@@ -204,12 +231,30 @@ def normalize_record(
 def build_bulk_payload(index_name: str, records: List[Dict], embeddings: List[List[float]]) -> str:
     lines = []
     for record, embedding in zip(records, embeddings):
-        action = {"index": {"_index": index_name, "_id": record["chunk_id"]}}
+        action = {"index": {"_index": index_name}}
         doc = dict(record)
         doc["vector"] = embedding
         lines.append(json.dumps(action))
         lines.append(json.dumps(doc))
     return "\n".join(lines) + "\n"
+
+
+def ensure_bulk_ok(response: Dict) -> None:
+    body = response.get("body") or ""
+    if not body:
+        return
+    payload = json.loads(body)
+    if not payload.get("errors"):
+        return
+    items = payload.get("items", [])
+    errors = []
+    for item in items:
+        action = next(iter(item.values()), {})
+        error = action.get("error")
+        if error:
+            errors.append(error)
+    sample = errors[:3]
+    raise Exception(f"OpenSearch bulk errors: {json.dumps(sample)}")
 
 
 def publish_metric(name: str, value: float, unit: str = "Count") -> None:
@@ -288,13 +333,14 @@ def handler(event, _context):
                 if embedding_dimension and embeddings and len(embeddings[0]) != embedding_dimension:
                     raise Exception("Embedding dimension mismatch.")
                 payload = build_bulk_payload(index_name, batch, embeddings)
-                opensearch_request(
+                response = opensearch_request(
                     endpoint,
                     "POST",
-                    "/_bulk",
+                    f"/{index_name}/_bulk",
                     body=payload,
                     content_type="application/x-ndjson"
                 )
+                ensure_bulk_ok(response)
                 processed += len(batch)
                 batch = []
 
@@ -303,13 +349,14 @@ def handler(event, _context):
             if embedding_dimension and embeddings and len(embeddings[0]) != embedding_dimension:
                 raise Exception("Embedding dimension mismatch.")
             payload = build_bulk_payload(index_name, batch, embeddings)
-            opensearch_request(
+            response = opensearch_request(
                 endpoint,
                 "POST",
-                "/_bulk",
+                f"/{index_name}/_bulk",
                 body=payload,
                 content_type="application/x-ndjson"
             )
+            ensure_bulk_ok(response)
             processed += len(batch)
 
         update_dataset(tenant_id, dataset_id, {"status": "READY"})

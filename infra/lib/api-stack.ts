@@ -32,11 +32,11 @@ export class ApiStack extends cdk.Stack {
     const embedModelId =
       this.node.tryGetContext('bedrockEmbedModelId') ||
       process.env.BEDROCK_EMBED_MODEL_ID ||
-      'amazon.titan-embed-text-v1';
+      'amazon.titan-embed-text-v2:0';
     const embeddingDimension =
       this.node.tryGetContext('embeddingDimension') ||
       process.env.EMBEDDING_DIMENSION ||
-      '1536';
+      '1024';
 
     const apiFn = new NodejsFunction(this, 'ApiHandler', {
       entry: path.join(__dirname, '../../backend/api/src/handler.ts'),

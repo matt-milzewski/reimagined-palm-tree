@@ -1,8 +1,9 @@
 import { SignatureV4 } from '@aws-sdk/signature-v4';
 import { HttpRequest } from '@aws-sdk/protocol-http';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
-import { Sha256 } from '@aws-sdk/hash-node';
+import { Hash } from '@aws-sdk/hash-node';
 import { NodeHttpHandler } from '@aws-sdk/node-http-handler';
+import { createHash } from 'node:crypto';
 
 type OpenSearchResponse = {
   status: number;
@@ -14,6 +15,12 @@ const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-e
 function ensureEndpoint(endpoint: string): URL {
   const value = endpoint.startsWith('http') ? endpoint : `https://${endpoint}`;
   return new URL(value);
+}
+
+class Sha256 extends Hash {
+  constructor(secret?: string | Uint8Array) {
+    super('sha256', secret);
+  }
 }
 
 async function streamToString(stream: any): Promise<string> {
@@ -38,6 +45,9 @@ export async function openSearchRequest(
 
   const url = ensureEndpoint(endpoint);
   const safePath = path.startsWith('/') ? path : `/${path}`;
+  const bodyString = body ? (typeof body === 'string' ? body : JSON.stringify(body)) : '';
+  const payloadHash = createHash('sha256').update(bodyString).digest('hex');
+
   const request = new HttpRequest({
     method,
     protocol: url.protocol,
@@ -45,9 +55,10 @@ export async function openSearchRequest(
     path: safePath,
     headers: {
       host: url.hostname,
-      'content-type': contentType
+      'content-type': contentType,
+      'x-amz-content-sha256': payloadHash
     },
-    body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined
+    body: bodyString || undefined
   });
 
   const signer = new SignatureV4({
