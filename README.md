@@ -180,6 +180,15 @@ Make sure the hosted zone exists in Route53 and the domain is using the Route53 
 ## Smoke test
 The smoke test signs in, creates a dataset, uploads a PDF, waits for completion, prints the readiness score, and runs a vector search query against the new index.
 
+What it does step by step:
+- Authenticates with Cognito using `USER_PASSWORD_AUTH` to get a JWT.
+- Creates a dataset via `POST /datasets`.
+- Requests a presigned URL via `POST /datasets/{datasetId}/files/presign`.
+- Uploads a PDF directly to S3 using the presigned URL.
+- Polls `GET /datasets/{datasetId}/files/{fileId}` until the file is COMPLETE or FAILED.
+- Downloads the quality report and prints the readiness score.
+- Runs `POST /rag/query` until results are returned and prints the top score and citation.
+
 ```
 export AWS_REGION=ap-southeast-2
 export API_BASE_URL=<ApiUrl>
@@ -193,6 +202,12 @@ python3 scripts/smoke_test.py
 By default it uses `Resume-5.pdf` in the repo. You can override the file:
 ```
 export SMOKE_TEST_PDF=/path/to/file.pdf
+```
+
+Query retries can be tuned:
+```
+export SMOKE_TEST_QUERY_ATTEMPTS=10
+export SMOKE_TEST_QUERY_DELAY=5
 ```
 
 ## Run unit tests
