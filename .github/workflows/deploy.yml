@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_PAGER: ""
+      CONTACT_RECIPIENT_EMAIL: ${{ secrets.CONTACT_RECIPIENT_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            infra/package-lock.json
+            backend/api/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install dependencies
+        run: npm run install:all
+
+      - name: Deploy infrastructure
+        run: |
+          CONTACT_ARGS=""
+          if [ -n "${CONTACT_RECIPIENT_EMAIL}" ]; then
+            CONTACT_ARGS="$CONTACT_ARGS -c contactRecipientEmail=${CONTACT_RECIPIENT_EMAIL}"
+          fi
+          if [ -n "${CONTACT_FROM_EMAIL}" ]; then
+            CONTACT_ARGS="$CONTACT_ARGS -c contactFromEmail=${CONTACT_FROM_EMAIL}"
+          fi
+          npm --prefix infra run cdk -- deploy --all --require-approval never $CONTACT_ARGS
+
+      - name: Load frontend env
+        run: |
+          API_URL=$(aws cloudformation describe-stacks --stack-name RagReadinessApiStack --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+          USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name RagReadinessAuthStack --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
+          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name RagReadinessAuthStack --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text)
+          echo "NEXT_PUBLIC_REGION=${AWS_REGION}" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_API_BASE_URL=${API_URL%/}" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_USER_POOL_ID=${USER_POOL_ID}" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_USER_POOL_CLIENT_ID=${USER_POOL_CLIENT_ID}" >> $GITHUB_ENV
+
+      - name: Build frontend
+        run: |
+          npm --prefix frontend run build
+          npm --prefix frontend run export
+
+      - name: Deploy frontend
+        run: |
+          FRONTEND_BUCKET=$(aws cloudformation describe-stacks --stack-name RagReadinessFrontendStack --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+          CLOUDFRONT_DISTRIBUTION_ID=$(aws cloudformation describe-stacks --stack-name RagReadinessFrontendStack --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" --output text)
+          FRONTEND_BUCKET=${FRONTEND_BUCKET} CLOUDFRONT_DISTRIBUTION_ID=${CLOUDFRONT_DISTRIBUTION_ID} npm run deploy:frontend
