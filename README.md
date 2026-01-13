@@ -1,6 +1,6 @@
-# RAG Readiness Pipeline
+# RagReady
 
-A production style SaaS starter that ingests construction documents, cleans and normalises them, and produces RAG ready outputs. It includes a static marketing site, an authenticated app, and an automated processing pipeline on AWS.
+RagReady is a production style SaaS starter that ingests construction documents, cleans and normalises them, and produces RAG ready outputs. It includes a static marketing site, an authenticated app, and an automated processing pipeline on AWS.
 
 ## What this repo includes
 - Static marketing site at `/` plus `/contact`

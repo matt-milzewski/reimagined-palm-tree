@@ -6,9 +6,12 @@ export function NavBar() {
 
   return (
     <div className="navbar">
-      <div>
-        <div style={{ fontWeight: 700 }}>RAG Readiness Pipeline</div>
-        <div style={{ color: 'var(--muted)', fontSize: 13 }}>Construction data readiness for AI assistants</div>
+      <div className="brand-stack">
+        <Link href="/" className="brand">
+          <img src="/ragready-logo.png" alt="RagReady logo" />
+          <span>RagReady</span>
+        </Link>
+        <div className="brand-tagline">Construction data readiness for AI assistants</div>
       </div>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         {isAuthenticated && (

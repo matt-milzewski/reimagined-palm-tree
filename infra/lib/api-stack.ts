@@ -60,7 +60,7 @@ export class ApiStack extends cdk.Stack {
     );
 
     const api = new apigateway.RestApi(this, 'RagReadinessApi', {
-      restApiName: 'RAG Readiness API',
+      restApiName: 'RagReady API',
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: ['GET', 'POST', 'OPTIONS'],

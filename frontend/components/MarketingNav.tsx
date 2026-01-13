@@ -18,7 +18,10 @@ export function MarketingNav() {
     <header className="marketing-nav">
       <div className="nav-inner">
         <Link href="/" className="logo" onClick={() => setOpen(false)}>
-          RAG Readiness Pipeline
+          <span className="brand">
+            <img src="/ragready-logo.png" alt="RagReady logo" />
+            <span>RagReady</span>
+          </span>
         </Link>
         <nav className={open ? 'nav-links open' : 'nav-links'} aria-label="Primary">
           {links.map((link) => (

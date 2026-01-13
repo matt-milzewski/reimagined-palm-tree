@@ -340,7 +340,7 @@ async function handlePublicContact(event: APIGatewayProxyEvent): Promise<APIGate
       Destination: { ToAddresses: [recipient] },
       Content: {
         Simple: {
-          Subject: { Data: 'RAG Readiness Pipeline contact request' },
+          Subject: { Data: 'RagReady contact request' },
           Body: { Text: { Data: emailBody } }
         }
       }

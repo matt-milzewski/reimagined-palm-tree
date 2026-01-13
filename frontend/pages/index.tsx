@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { MarketingNav } from '../components/MarketingNav';
 import { Accordion, Button, Card, Container, Section, Tabs } from '../components/MarketingUI';
 
-const PRODUCT_NAME = 'RAG Readiness Pipeline';
+const PRODUCT_NAME = 'RagReady';
 
 const painPoints = [
   {

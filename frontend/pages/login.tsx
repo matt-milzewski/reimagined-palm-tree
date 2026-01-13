@@ -152,8 +152,13 @@ export default function LoginPage() {
       <NavBar />
       <main>
         <div className="page-header">
-          <h1 className="page-title">RAG Readiness Pipeline</h1>
-          <p className="page-subtitle">Prepare project knowledge for reliable retrieval.</p>
+          <div className="brand brand-header">
+            <img src="/ragready-logo.png" alt="RagReady logo" />
+            <div>
+              <h1 className="page-title">RagReady</h1>
+              <p className="page-subtitle">Prepare project knowledge for reliable retrieval.</p>
+            </div>
+          </div>
         </div>
 
         <div className="card" style={{ maxWidth: 420 }}>

@@ -4,7 +4,7 @@ import { MarketingNav } from '../components/MarketingNav';
 import { Button, Card, Container, Section } from '../components/MarketingUI';
 import { apiRequest } from '../lib/api';
 
-const PRODUCT_NAME = 'RAG Readiness Pipeline';
+const PRODUCT_NAME = 'RagReady';
 
 const storageOptions = ['SharePoint', 'Confluence', 'Teams or OneDrive', 'Local files', 'S3', 'Other'];
 
