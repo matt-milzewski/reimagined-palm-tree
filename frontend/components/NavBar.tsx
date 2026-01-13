@@ -17,6 +17,7 @@ export function NavBar() {
         {isAuthenticated && (
           <>
             <Link className="btn secondary" href="/dashboard">Dashboard</Link>
+            <Link className="btn secondary" href="/chat">Chat</Link>
             <button className="btn" onClick={logout}>Logout</button>
           </>
         )}

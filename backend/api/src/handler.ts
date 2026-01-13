@@ -9,6 +9,7 @@ import { getTenantContext } from '../../shared/auth';
 import { log } from '../../shared/logger';
 import { newId } from '../../shared/ids';
 import { buildKnnQuery, openSearchRequest } from './opensearch';
+import { validateDatasetForChat } from './chat-utils';
 
 const s3 = new S3Client({});
 const ses = new SESv2Client({});
@@ -24,7 +25,11 @@ const CONTACT_RECIPIENT_EMAIL = process.env.CONTACT_RECIPIENT_EMAIL || '';
 const CONTACT_FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || '';
 const OPENSEARCH_INDEX_NAME = process.env.OPENSEARCH_INDEX_NAME || '';
 const BEDROCK_EMBED_MODEL_ID = process.env.BEDROCK_EMBED_MODEL_ID || '';
+const BEDROCK_CHAT_MODEL_ID = process.env.BEDROCK_CHAT_MODEL_ID || '';
 const EMBEDDING_DIMENSION = Number.parseInt(process.env.EMBEDDING_DIMENSION || '0', 10);
+const CHAT_TOP_K_DEFAULT = Number.parseInt(process.env.CHAT_TOP_K_DEFAULT || '8', 10);
+const CONVERSATIONS_TABLE = process.env.CONVERSATIONS_TABLE || '';
+const MESSAGES_TABLE = process.env.MESSAGES_TABLE || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,6 +93,108 @@ async function embedQuery(text: string): Promise<number[]> {
     throw new Error('Embedding dimension mismatch.');
   }
   return embedding;
+}
+
+type Citation = {
+  chunk_id: string;
+  filename: string;
+  page?: number | null;
+  snippet?: string;
+  score?: number;
+  doc_id?: string;
+};
+
+const chatSystemPrompt = [
+  'You are RagReady, an assistant for construction teams.',
+  'Answer using only the provided sources.',
+  'If the sources do not contain the answer, say you do not know.',
+  'Prefer concise answers and bullet points where helpful.',
+  'Always add citations like [S1] at the end of relevant sentences.'
+].join('\n');
+
+function normalizeSnippet(text: string, maxLength: number): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= maxLength) return cleaned;
+  return `${cleaned.slice(0, maxLength).trim()}...`;
+}
+
+function buildCitations(hits: any[]): { citations: Citation[]; sourcesText: string } {
+  const citations: Citation[] = [];
+  const sources: string[] = [];
+
+  hits.forEach((hit, index) => {
+    const source = hit?._source || {};
+    const rawText = typeof source.text === 'string' ? source.text : '';
+    const snippet = normalizeSnippet(rawText, 260);
+    const contextText = normalizeSnippet(rawText, 1200);
+    const filename = source.filename || 'source';
+    const page = source.page ?? null;
+    const pageLabel = page !== null && page !== undefined ? ` p${page}` : '';
+
+    citations.push({
+      chunk_id: source.chunk_id || hit._id,
+      filename,
+      page,
+      doc_id: source.doc_id,
+      score: hit._score ?? 0,
+      snippet
+    });
+
+    sources.push(`[S${index + 1}] ${filename}${pageLabel}\n${contextText}`);
+  });
+
+  return { citations, sourcesText: sources.join('\n\n') };
+}
+
+function buildChatPrompt(question: string, sourcesText: string): string {
+  return `Question:\n${question}\n\nSources:\n${sourcesText}\n\nAnswer:`;
+}
+
+async function invokeChatModel(prompt: string): Promise<string> {
+  if (!BEDROCK_CHAT_MODEL_ID) {
+    throw new Error('Missing Bedrock chat model configuration.');
+  }
+
+  let body = '';
+  const modelId = BEDROCK_CHAT_MODEL_ID;
+
+  if (modelId.startsWith('anthropic.')) {
+    body = JSON.stringify({
+      anthropic_version: 'bedrock-2023-05-31',
+      max_tokens: 800,
+      temperature: 0.2,
+      system: chatSystemPrompt,
+      messages: [{ role: 'user', content: prompt }]
+    });
+  } else if (modelId.startsWith('amazon.titan-text')) {
+    body = JSON.stringify({
+      inputText: `${chatSystemPrompt}\n\n${prompt}`,
+      textGenerationConfig: { maxTokenCount: 800, temperature: 0.2, topP: 0.9 }
+    });
+  } else {
+    body = JSON.stringify({ inputText: `${chatSystemPrompt}\n\n${prompt}` });
+  }
+
+  const command = new InvokeModelCommand({
+    modelId,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body
+  });
+  const response = await bedrock.send(command);
+  const payload = JSON.parse(await readBody(response.body));
+
+  if (modelId.startsWith('anthropic.')) {
+    const content = Array.isArray(payload.content) ? payload.content : [];
+    const text = content.map((part: any) => part.text || '').join('');
+    if (text) return text;
+    if (payload.completion) return payload.completion;
+  }
+
+  if (payload.results?.[0]?.outputText) return payload.results[0].outputText;
+  if (payload.outputText) return payload.outputText;
+
+  throw new Error('Unsupported chat model response format.');
 }
 
 function getPath(event: APIGatewayProxyEvent): string {
@@ -418,6 +525,47 @@ async function handlePublicContact(event: APIGatewayProxyEvent): Promise<APIGate
   return jsonResponse(200, { ok: true });
 }
 
+async function handleDocumentPresign(event: APIGatewayProxyEvent, docId: string): Promise<APIGatewayProxyResult> {
+  const { tenantId, email, username } = getTenantContext(event);
+  const datasetId = event.queryStringParameters?.datasetId;
+
+  if (!datasetId) {
+    return jsonResponse(400, { message: 'datasetId is required.' });
+  }
+  if (!RAW_BUCKET) {
+    return jsonResponse(500, { message: 'Raw bucket not configured.' });
+  }
+
+  const tenantDatasetId = `${tenantId}#${datasetId}`;
+  const result = await ddb.send(
+    new GetCommand({
+      TableName: FILES_TABLE,
+      Key: { tenantDatasetId, fileId: docId }
+    })
+  );
+
+  if (!result.Item) {
+    return jsonResponse(404, { message: 'Document not found.' });
+  }
+
+  const rawKey =
+    result.Item.rawS3Key ||
+    `raw/${tenantId}/${datasetId}/${docId}/${result.Item.filename || 'document.pdf'}`;
+
+  const url = await getSignedUrl(
+    s3,
+    new GetObjectCommand({
+      Bucket: RAW_BUCKET,
+      Key: rawKey
+    }),
+    { expiresIn: 300 }
+  );
+
+  await putAudit(tenantId, 'DOWNLOAD_SOURCE', { datasetId, fileId: docId }, email || username || tenantId);
+
+  return jsonResponse(200, { url, expires_in: 300 });
+}
+
 async function handleRagQuery(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   const { tenantId } = getTenantContext(event);
   const body = parseJson(event.body);
@@ -457,13 +605,165 @@ async function handleRagQuery(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     citation: {
       filename: hit._source?.filename,
       page: hit._source?.page ?? null,
-      source_uri: hit._source?.source_uri,
       chunk_id: hit._source?.chunk_id,
       doc_id: hit._source?.doc_id
     }
   }));
 
   return jsonResponse(200, { results });
+}
+
+async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const { tenantId, email, username } = getTenantContext(event);
+  const body = parseJson(event.body);
+  const datasetId = body.dataset_id || body.datasetId;
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+  const topK = Number.isFinite(body.top_k)
+    ? Math.max(1, Math.min(Number(body.top_k), 20))
+    : Math.max(1, Math.min(CHAT_TOP_K_DEFAULT || 8, 20));
+
+  if (!datasetId || typeof datasetId !== 'string') {
+    return jsonResponse(400, { message: 'dataset_id is required.' });
+  }
+  if (!message) {
+    return jsonResponse(400, { message: 'message is required.' });
+  }
+  if (!CONVERSATIONS_TABLE || !MESSAGES_TABLE) {
+    return jsonResponse(500, { message: 'Chat storage not configured.' });
+  }
+  if (!OPENSEARCH_INDEX_NAME) {
+    return jsonResponse(500, { message: 'Vector index not configured.' });
+  }
+
+  const datasetResult = await ddb.send(
+    new GetCommand({
+      TableName: DATASETS_TABLE,
+      Key: { tenantId, datasetId }
+    })
+  );
+
+  const datasetValidation = validateDatasetForChat(tenantId, datasetResult.Item as Record<string, any> | undefined);
+  if (!datasetValidation.ok) {
+    return jsonResponse(datasetValidation.statusCode, { message: datasetValidation.message });
+  }
+
+  let conversationId = body.conversation_id || body.conversationId;
+  const now = nowIso();
+  if (conversationId) {
+    const existing = await ddb.send(
+      new GetCommand({
+        TableName: CONVERSATIONS_TABLE,
+        Key: { tenantId, conversationId }
+      })
+    );
+    if (!existing.Item) {
+      return jsonResponse(404, { message: 'Conversation not found.' });
+    }
+    if (existing.Item.datasetId !== datasetId) {
+      return jsonResponse(409, { message: 'Conversation dataset mismatch.' });
+    }
+  } else {
+    conversationId = newId();
+    await ddb.send(
+      new PutCommand({
+        TableName: CONVERSATIONS_TABLE,
+        Item: {
+          tenantId,
+          conversationId,
+          datasetId,
+          title: message.slice(0, 60),
+          createdAt: now,
+          updatedAt: now
+        }
+      })
+    );
+  }
+
+  const userMessageId = newId();
+  const userCreatedAt = nowIso();
+  await ddb.send(
+    new PutCommand({
+      TableName: MESSAGES_TABLE,
+      Item: {
+        tenantConversationId: `${tenantId}#${conversationId}`,
+        createdAtMessageId: `${userCreatedAt}#${userMessageId}`,
+        messageId: userMessageId,
+        conversationId,
+        tenantId,
+        datasetId,
+        role: 'user',
+        content: message,
+        createdAt: userCreatedAt
+      }
+    })
+  );
+
+  const vector = await embedQuery(message);
+  const searchPayload = buildKnnQuery({
+    tenantId,
+    datasetId,
+    vector,
+    topK
+  });
+
+  const response = await openSearchRequest('POST', `/${OPENSEARCH_INDEX_NAME}/_search`, searchPayload);
+  if (response.status >= 300) {
+    log('ERROR', 'OpenSearch retrieval failed', { status: response.status });
+    return jsonResponse(500, { message: 'Retrieval failed.' });
+  }
+
+  const payload = response.body ? JSON.parse(response.body) : {};
+  const hits = payload.hits?.hits || [];
+  const { citations, sourcesText } = buildCitations(hits);
+
+  let answer = 'I do not know based on the available sources.';
+  if (citations.length > 0) {
+    const prompt = buildChatPrompt(message, sourcesText);
+    answer = await invokeChatModel(prompt);
+  }
+
+  const assistantMessageId = newId();
+  const assistantCreatedAt = nowIso();
+  await ddb.send(
+    new PutCommand({
+      TableName: MESSAGES_TABLE,
+      Item: {
+        tenantConversationId: `${tenantId}#${conversationId}`,
+        createdAtMessageId: `${assistantCreatedAt}#${assistantMessageId}`,
+        messageId: assistantMessageId,
+        conversationId,
+        tenantId,
+        datasetId,
+        role: 'assistant',
+        content: answer,
+        citations,
+        createdAt: assistantCreatedAt
+      }
+    })
+  );
+
+  await ddb.send(
+    new UpdateCommand({
+      TableName: CONVERSATIONS_TABLE,
+      Key: { tenantId, conversationId },
+      UpdateExpression: 'SET updatedAt = :u',
+      ExpressionAttributeValues: { ':u': assistantCreatedAt }
+    })
+  );
+
+  await putAudit(
+    tenantId,
+    'CHAT_MESSAGE',
+    { datasetId, conversationId, messageId: assistantMessageId },
+    email || username || tenantId
+  );
+
+  return jsonResponse(200, {
+    conversation_id: conversationId,
+    message_id: assistantMessageId,
+    answer,
+    citations
+  });
 }
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
@@ -479,8 +779,17 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       return await handlePublicContact(event);
     }
 
+    if (path === '/chat' && method === 'POST') {
+      return await handleChat(event);
+    }
+
     if (path === '/rag/query' && method === 'POST') {
       return await handleRagQuery(event);
+    }
+
+    const documentPresignMatch = path.match(/^\/documents\/([^/]+)\/presign$/);
+    if (documentPresignMatch && method === 'GET') {
+      return await handleDocumentPresign(event, documentPresignMatch[1]);
     }
 
     if (path === '/me' && method === 'GET') {

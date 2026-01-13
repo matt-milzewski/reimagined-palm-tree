@@ -12,6 +12,8 @@ export class StorageStack extends cdk.Stack {
   public readonly filesTable: dynamodb.Table;
   public readonly jobsTable: dynamodb.Table;
   public readonly auditTable: dynamodb.Table;
+  public readonly conversationsTable: dynamodb.Table;
+  public readonly messagesTable: dynamodb.Table;
   public readonly ingestionQueue: sqs.Queue;
   public readonly ingestionDlq: sqs.Queue;
 
@@ -93,6 +95,18 @@ export class StorageStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST
     });
 
+    this.conversationsTable = new dynamodb.Table(this, 'ConversationsTable', {
+      partitionKey: { name: 'tenantId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'conversationId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST
+    });
+
+    this.messagesTable = new dynamodb.Table(this, 'MessagesTable', {
+      partitionKey: { name: 'tenantConversationId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAtMessageId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST
+    });
+
     new cdk.CfnOutput(this, 'RawBucketName', { value: this.rawBucket.bucketName });
     new cdk.CfnOutput(this, 'ProcessedBucketName', { value: this.processedBucket.bucketName });
     new cdk.CfnOutput(this, 'IngestionQueueUrl', { value: this.ingestionQueue.queueUrl });
@@ -100,5 +114,7 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'FilesTableName', { value: this.filesTable.tableName });
     new cdk.CfnOutput(this, 'JobsTableName', { value: this.jobsTable.tableName });
     new cdk.CfnOutput(this, 'AuditTableName', { value: this.auditTable.tableName });
+    new cdk.CfnOutput(this, 'ConversationsTableName', { value: this.conversationsTable.tableName });
+    new cdk.CfnOutput(this, 'MessagesTableName', { value: this.messagesTable.tableName });
   }
 }

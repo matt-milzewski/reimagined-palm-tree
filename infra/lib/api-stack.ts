@@ -33,10 +33,18 @@ export class ApiStack extends cdk.Stack {
       this.node.tryGetContext('bedrockEmbedModelId') ||
       process.env.BEDROCK_EMBED_MODEL_ID ||
       'amazon.titan-embed-text-v2:0';
+    const chatModelId =
+      this.node.tryGetContext('bedrockChatModelId') ||
+      process.env.BEDROCK_CHAT_MODEL_ID ||
+      'anthropic.claude-3-haiku-20240307-v1:0';
     const embeddingDimension =
       this.node.tryGetContext('embeddingDimension') ||
       process.env.EMBEDDING_DIMENSION ||
       '1024';
+    const chatTopKDefault =
+      this.node.tryGetContext('chatTopKDefault') ||
+      process.env.CHAT_TOP_K_DEFAULT ||
+      '8';
 
     const apiFn = new NodejsFunction(this, 'ApiHandler', {
       entry: path.join(__dirname, '../../backend/api/src/handler.ts'),
@@ -48,6 +56,8 @@ export class ApiStack extends cdk.Stack {
         FILES_TABLE: props.storage.filesTable.tableName,
         JOBS_TABLE: props.storage.jobsTable.tableName,
         AUDIT_TABLE: props.storage.auditTable.tableName,
+        CONVERSATIONS_TABLE: props.storage.conversationsTable.tableName,
+        MESSAGES_TABLE: props.storage.messagesTable.tableName,
         RAW_BUCKET: props.storage.rawBucket.bucketName,
         PROCESSED_BUCKET: props.storage.processedBucket.bucketName,
         CONTACT_RECIPIENT_EMAIL: contactRecipientEmail,
@@ -55,7 +65,9 @@ export class ApiStack extends cdk.Stack {
         OPENSEARCH_COLLECTION_ENDPOINT: props.vector.collectionEndpoint,
         OPENSEARCH_INDEX_NAME: props.vector.indexName,
         BEDROCK_EMBED_MODEL_ID: embedModelId,
-        EMBEDDING_DIMENSION: embeddingDimension
+        BEDROCK_CHAT_MODEL_ID: chatModelId,
+        EMBEDDING_DIMENSION: embeddingDimension,
+        CHAT_TOP_K_DEFAULT: chatTopKDefault
       }
     });
 
@@ -63,7 +75,10 @@ export class ApiStack extends cdk.Stack {
     props.storage.filesTable.grantReadWriteData(apiFn);
     props.storage.jobsTable.grantReadWriteData(apiFn);
     props.storage.auditTable.grantReadWriteData(apiFn);
+    props.storage.conversationsTable.grantReadWriteData(apiFn);
+    props.storage.messagesTable.grantReadWriteData(apiFn);
     props.storage.rawBucket.grantPut(apiFn);
+    props.storage.rawBucket.grantRead(apiFn);
     props.storage.processedBucket.grantRead(apiFn);
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -78,6 +93,12 @@ export class ApiStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],
         resources: [`arn:aws:bedrock:${this.region}::foundation-model/${embedModelId}`]
+      })
+    );
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [`arn:aws:bedrock:${this.region}::foundation-model/${chatModelId}`]
       })
     );
     apiFn.addToRolePolicy(

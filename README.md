@@ -111,7 +111,9 @@ The vector ingestion pipeline uses Bedrock to embed chunks and OpenSearch Server
 OPENSEARCH_COLLECTION_ENDPOINT=https://<collection-id>.<region>.aoss.amazonaws.com
 OPENSEARCH_INDEX_NAME=ragready_chunks_v1
 BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
+BEDROCK_CHAT_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
 EMBEDDING_DIMENSION=1024
+CHAT_TOP_K_DEFAULT=8
 INGEST_BATCH_SIZE=50
 INGEST_CONCURRENCY=4
 ```
@@ -131,6 +133,27 @@ curl -X POST "$API_BASE_URL/rag/query" \
     "top_k": 8
   }'
 ```
+
+Results include `doc_id`, `filename`, `page`, and `chunk_id`. Use the presign endpoint to open the original file.
+
+## Chat API
+Chat uses Bedrock for generation and OpenSearch for retrieval. The dataset must be READY.
+
+```
+curl -X POST "$API_BASE_URL/chat" \
+  -H "Authorization: Bearer <id-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_id": "ds_123",
+    "message": "Summarise the key requirements.",
+    "top_k": 8
+  }'
+```
+
+The response includes `conversation_id`, `message_id`, an `answer`, and citations.
+
+## Source presign
+Use `GET /documents/{docId}/presign?datasetId=...` to get a short lived URL for the original PDF.
 
 ## Custom domain for the frontend
 The frontend stack supports a custom domain through CDK context or environment variables. This sets up:
