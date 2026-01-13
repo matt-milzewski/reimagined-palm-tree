@@ -2,14 +2,17 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ddb } from '../../shared/ddb';
 import { getTenantContext } from '../../shared/auth';
 import { log } from '../../shared/logger';
 import { newId } from '../../shared/ids';
+import { buildKnnQuery, openSearchRequest } from './opensearch';
 
 const s3 = new S3Client({});
 const ses = new SESv2Client({});
+const bedrock = new BedrockRuntimeClient({});
 
 const DATASETS_TABLE = process.env.DATASETS_TABLE || '';
 const FILES_TABLE = process.env.FILES_TABLE || '';
@@ -19,6 +22,9 @@ const RAW_BUCKET = process.env.RAW_BUCKET || '';
 const PROCESSED_BUCKET = process.env.PROCESSED_BUCKET || '';
 const CONTACT_RECIPIENT_EMAIL = process.env.CONTACT_RECIPIENT_EMAIL || '';
 const CONTACT_FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || '';
+const OPENSEARCH_INDEX_NAME = process.env.OPENSEARCH_INDEX_NAME || '';
+const BEDROCK_EMBED_MODEL_ID = process.env.BEDROCK_EMBED_MODEL_ID || '';
+const EMBEDDING_DIMENSION = Number.parseInt(process.env.EMBEDDING_DIMENSION || '0', 10);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +51,43 @@ function parseJson(body?: string | null): any {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+async function readBody(body: any): Promise<string> {
+  if (!body) return '';
+  if (typeof body === 'string') return body;
+  if (Buffer.isBuffer(body)) return body.toString('utf-8');
+  if (body instanceof Uint8Array) return Buffer.from(body).toString('utf-8');
+  if (typeof body.transformToString === 'function') {
+    return await body.transformToString();
+  }
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of body) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks).toString('utf-8');
+}
+
+async function embedQuery(text: string): Promise<number[]> {
+  if (!BEDROCK_EMBED_MODEL_ID) {
+    throw new Error('Missing Bedrock model configuration.');
+  }
+  const command = new InvokeModelCommand({
+    modelId: BEDROCK_EMBED_MODEL_ID,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: JSON.stringify({ inputText: text })
+  });
+  const response = await bedrock.send(command);
+  const payload = JSON.parse(await readBody(response.body));
+  const embedding = payload.embedding || (Array.isArray(payload.embeddings) ? payload.embeddings[0] : payload.vector);
+  if (!embedding) {
+    throw new Error('Unsupported embedding response format.');
+  }
+  if (EMBEDDING_DIMENSION && embedding.length !== EMBEDDING_DIMENSION) {
+    throw new Error('Embedding dimension mismatch.');
+  }
+  return embedding;
 }
 
 function getPath(event: APIGatewayProxyEvent): string {
@@ -118,6 +161,7 @@ async function handleCreateDataset(event: APIGatewayProxyEvent): Promise<APIGate
 
   const datasetId = newId();
   const createdAt = nowIso();
+  const updatedAt = createdAt;
 
   await ddb.send(
     new PutCommand({
@@ -126,7 +170,9 @@ async function handleCreateDataset(event: APIGatewayProxyEvent): Promise<APIGate
         tenantId,
         datasetId,
         name: body.name.trim(),
-        createdAt
+        createdAt,
+        updatedAt,
+        status: 'UPLOADED'
       }
     })
   );
@@ -177,6 +223,16 @@ async function handlePresign(event: APIGatewayProxyEvent, datasetId: string): Pr
   const createdAt = nowIso();
   const rawS3Key = `raw/${tenantId}/${datasetId}/${fileId}/${body.filename}`;
   const tenantDatasetId = `${tenantId}#${datasetId}`;
+
+  await ddb.send(
+    new UpdateCommand({
+      TableName: DATASETS_TABLE,
+      Key: { tenantId, datasetId },
+      UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':status': 'UPLOADED', ':updatedAt': createdAt }
+    })
+  );
 
   await ddb.send(
     new PutCommand({
@@ -362,6 +418,54 @@ async function handlePublicContact(event: APIGatewayProxyEvent): Promise<APIGate
   return jsonResponse(200, { ok: true });
 }
 
+async function handleRagQuery(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const { tenantId } = getTenantContext(event);
+  const body = parseJson(event.body);
+  const datasetId = body.dataset_id || body.datasetId;
+  const query = typeof body.query === 'string' ? body.query.trim() : body.query;
+  const topK = Number.isFinite(body.top_k) ? Math.max(1, Math.min(body.top_k, 20)) : 8;
+
+  if (!datasetId || typeof datasetId !== 'string') {
+    return jsonResponse(400, { message: 'dataset_id is required.' });
+  }
+  if (!query || typeof query !== 'string') {
+    return jsonResponse(400, { message: 'query is required.' });
+  }
+  if (!OPENSEARCH_INDEX_NAME) {
+    return jsonResponse(500, { message: 'Vector index not configured.' });
+  }
+
+  const vector = await embedQuery(query);
+  const searchPayload = buildKnnQuery({
+    tenantId,
+    datasetId,
+    vector,
+    topK
+  });
+
+  const response = await openSearchRequest('POST', `/${OPENSEARCH_INDEX_NAME}/_search`, searchPayload);
+  if (response.status >= 300) {
+    log('ERROR', 'OpenSearch query failed', { status: response.status, body: response.body });
+    return jsonResponse(500, { message: 'Vector query failed.' });
+  }
+
+  const payload = response.body ? JSON.parse(response.body) : {};
+  const hits = payload.hits?.hits || [];
+  const results = hits.map((hit: any) => ({
+    text: hit._source?.text || '',
+    score: hit._score || 0,
+    citation: {
+      filename: hit._source?.filename,
+      page: hit._source?.page ?? null,
+      source_uri: hit._source?.source_uri,
+      chunk_id: hit._source?.chunk_id,
+      doc_id: hit._source?.doc_id
+    }
+  }));
+
+  return jsonResponse(200, { results });
+}
+
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
     if (event.httpMethod === 'OPTIONS') {
@@ -373,6 +477,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (path === '/public/contact' && method === 'POST') {
       return await handlePublicContact(event);
+    }
+
+    if (path === '/rag/query' && method === 'POST') {
+      return await handleRagQuery(event);
     }
 
     if (path === '/me' && method === 'GET') {

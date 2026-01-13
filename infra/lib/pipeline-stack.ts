@@ -5,18 +5,39 @@ import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import { StorageStack } from './storage-stack';
+import { VectorStack } from './vector-stack';
 
 interface PipelineStackProps extends cdk.StackProps {
   storage: StorageStack;
+  vector: VectorStack;
 }
 
 export class PipelineStack extends cdk.Stack {
   public readonly stateMachine: sfn.StateMachine;
+  public readonly ingestionRoleArn: string;
 
   constructor(scope: Construct, id: string, props: PipelineStackProps) {
     super(scope, id, props);
+
+    const embedModelId =
+      this.node.tryGetContext('bedrockEmbedModelId') ||
+      process.env.BEDROCK_EMBED_MODEL_ID ||
+      'amazon.titan-embed-text-v1';
+    const embeddingDimension =
+      this.node.tryGetContext('embeddingDimension') ||
+      process.env.EMBEDDING_DIMENSION ||
+      '1536';
+    const ingestBatchSize =
+      this.node.tryGetContext('ingestBatchSize') ||
+      process.env.INGEST_BATCH_SIZE ||
+      '50';
+    const ingestConcurrency =
+      this.node.tryGetContext('ingestConcurrency') ||
+      process.env.INGEST_CONCURRENCY ||
+      '4';
 
     const envVars = {
       RAW_BUCKET: props.storage.rawBucket.bucketName,
@@ -26,7 +47,13 @@ export class PipelineStack extends cdk.Stack {
       DATASETS_TABLE: props.storage.datasetsTable.tableName,
       AUDIT_TABLE: props.storage.auditTable.tableName,
       FILES_GSI_HASH: 'rawSha256-index',
-      FILES_GSI_RECENT: 'tenantCreatedAt-index'
+      FILES_GSI_RECENT: 'tenantCreatedAt-index',
+      OPENSEARCH_COLLECTION_ENDPOINT: props.vector.collectionEndpoint,
+      OPENSEARCH_INDEX_NAME: props.vector.indexName,
+      BEDROCK_EMBED_MODEL_ID: embedModelId,
+      EMBEDDING_DIMENSION: embeddingDimension,
+      INGEST_BATCH_SIZE: ingestBatchSize,
+      INGEST_CONCURRENCY: ingestConcurrency
     };
 
     const entryPath = path.join(__dirname, '../../backend/pipeline');
@@ -47,6 +74,7 @@ export class PipelineStack extends cdk.Stack {
     const normalizeFn = createPipelineFn('NormalizeFn', 'normalize.py', 60);
     const qualityFn = createPipelineFn('QualityChecksFn', 'quality_checks.py', 60);
     const chunkFn = createPipelineFn('ChunkFn', 'chunk.py', 60);
+    const vectorIngestFn = createPipelineFn('VectorIngestFn', 'vector_ingest.py', 300);
     const persistFn = createPipelineFn('PersistResultsFn', 'persist_results.py', 60);
     const failFn = createPipelineFn('FailHandlerFn', 'fail_handler.py', 30);
 
@@ -55,6 +83,7 @@ export class PipelineStack extends cdk.Stack {
     props.storage.processedBucket.grantReadWrite(normalizeFn);
     props.storage.processedBucket.grantReadWrite(qualityFn);
     props.storage.processedBucket.grantReadWrite(chunkFn);
+    props.storage.processedBucket.grantRead(vectorIngestFn);
     props.storage.processedBucket.grantReadWrite(persistFn);
 
     props.storage.filesTable.grantReadWriteData(markRunningFn);
@@ -66,13 +95,32 @@ export class PipelineStack extends cdk.Stack {
     props.storage.filesTable.grantReadWriteData(qualityFn);
     props.storage.jobsTable.grantReadWriteData(qualityFn);
 
+    props.storage.datasetsTable.grantReadWriteData(chunkFn);
+
     props.storage.jobsTable.grantReadWriteData(persistFn);
     props.storage.filesTable.grantReadWriteData(persistFn);
     props.storage.auditTable.grantReadWriteData(persistFn);
 
+    props.storage.datasetsTable.grantReadWriteData(vectorIngestFn);
+    props.storage.auditTable.grantReadWriteData(vectorIngestFn);
+
     props.storage.jobsTable.grantReadWriteData(failFn);
     props.storage.filesTable.grantReadWriteData(failFn);
     props.storage.auditTable.grantReadWriteData(failFn);
+    props.storage.datasetsTable.grantReadWriteData(failFn);
+
+    vectorIngestFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [`arn:aws:bedrock:${this.region}::foundation-model/${embedModelId}`]
+      })
+    );
+    vectorIngestFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['aoss:APIAccessAll'],
+        resources: [props.vector.collectionArn]
+      })
+    );
 
     const markRunningTask = new tasks.LambdaInvoke(this, 'MarkRunning', {
       lambdaFunction: markRunningFn,
@@ -94,6 +142,10 @@ export class PipelineStack extends cdk.Stack {
       lambdaFunction: chunkFn,
       payloadResponseOnly: true
     });
+    const ingestTask = new tasks.LambdaInvoke(this, 'VectorIngest', {
+      lambdaFunction: vectorIngestFn,
+      payloadResponseOnly: true
+    });
     const persistTask = new tasks.LambdaInvoke(this, 'PersistResults', {
       lambdaFunction: persistFn,
       payloadResponseOnly: true
@@ -108,9 +160,10 @@ export class PipelineStack extends cdk.Stack {
       .next(normalizeTask)
       .next(qualityTask)
       .next(chunkTask)
+      .next(ingestTask)
       .next(persistTask);
 
-    for (const task of [markRunningTask, extractTask, normalizeTask, qualityTask, chunkTask, persistTask]) {
+    for (const task of [markRunningTask, extractTask, normalizeTask, qualityTask, chunkTask, ingestTask, persistTask]) {
       task.addCatch(failTask, { resultPath: '$.error' });
     }
 
@@ -138,6 +191,8 @@ export class PipelineStack extends cdk.Stack {
     props.storage.jobsTable.grantReadWriteData(dispatcherFn);
     props.storage.ingestionQueue.grantConsumeMessages(dispatcherFn);
     this.stateMachine.grantStartExecution(dispatcherFn);
+
+    this.ingestionRoleArn = vectorIngestFn.role?.roleArn || '';
 
     new cdk.CfnOutput(this, 'StateMachineArn', { value: this.stateMachine.stateMachineArn });
   }

@@ -5,6 +5,7 @@ from .aws import get_ddb_resource, get_env
 _env = get_env()
 
 ddb = get_ddb_resource()
+datasets_table = ddb.Table(_env["DATASETS_TABLE"])
 files_table = ddb.Table(_env["FILES_TABLE"])
 jobs_table = ddb.Table(_env["JOBS_TABLE"])
 audit_table = ddb.Table(_env["AUDIT_TABLE"])
@@ -34,6 +35,11 @@ def update_item(table, key: Dict, updates: Dict) -> None:
 def update_file(tenant_dataset_id: str, file_id: str, updates: Dict) -> None:
     updates = {**updates, "updatedAt": now_iso()}
     update_item(files_table, {"tenantDatasetId": tenant_dataset_id, "fileId": file_id}, updates)
+
+
+def update_dataset(tenant_id: str, dataset_id: str, updates: Dict) -> None:
+    updates = {**updates, "updatedAt": now_iso()}
+    update_item(datasets_table, {"tenantId": tenant_id, "datasetId": dataset_id}, updates)
 
 
 def put_job(item: Dict) -> None:

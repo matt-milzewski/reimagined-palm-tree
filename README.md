@@ -7,6 +7,7 @@ RagReady is a production style SaaS starter that ingests construction documents,
 - Authenticated app at `/login` with datasets, uploads, and job status
 - S3 based upload flow using presigned URLs
 - Step Functions pipeline for extract, normalise, quality checks, chunking, and persistence
+- OpenSearch Serverless vector storage with Bedrock embeddings for retrieval
 - DynamoDB metadata tables for datasets, files, jobs, and audit events
 - CloudFront hosted frontend
 
@@ -15,8 +16,10 @@ RagReady is a production style SaaS starter that ingests construction documents,
 - API Gateway REST API + Lambda (Node.js)
 - S3 raw and processed buckets
 - SQS ingestion queue + dispatcher Lambda
-- Step Functions pipeline (Extract -> Normalise -> Quality -> Chunk -> Persist)
+- Step Functions pipeline (Extract -> Normalise -> Quality -> Chunk -> Vector ingest -> Persist)
 - DynamoDB tables for datasets, files, jobs, audit log
+- OpenSearch Serverless vector collection for chunk storage and retrieval
+- Bedrock embeddings for chunk and query vectors
 - CloudFront + S3 for static Next.js export
 
 ## Repo structure
@@ -56,6 +59,8 @@ Capture the CDK outputs:
 - `FrontendBucketName`
 - `FrontendDistributionId`
 - `FrontendUrl`
+- `VectorCollectionEndpoint`
+- `VectorIndexName`
 
 ## Configure frontend
 ```
@@ -98,6 +103,34 @@ npm run cdk deploy RagReadinessApiStack --require-approval never \
 ```
 
 Make sure the sender address is verified in SES. In SES sandbox you can only send to verified addresses.
+
+## Vector search configuration
+The vector ingestion pipeline uses Bedrock to embed chunks and OpenSearch Serverless to store them. These settings are passed to the pipeline and API Lambdas as environment variables:
+
+```
+OPENSEARCH_COLLECTION_ENDPOINT=https://<collection-id>.<region>.aoss.amazonaws.com
+OPENSEARCH_INDEX_NAME=ragready_chunks_v1
+BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v1
+EMBEDDING_DIMENSION=1536
+INGEST_BATCH_SIZE=50
+INGEST_CONCURRENCY=4
+```
+
+Bedrock access must be enabled in the AWS account and region you deploy to.
+
+## Retrieval API
+Query the vector store with `POST /rag/query`:
+
+```
+curl -X POST "$API_BASE_URL/rag/query" \
+  -H "Authorization: Bearer <id-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_id": "ds_123",
+    "query": "What are the installation requirements?",
+    "top_k": 8
+  }'
+```
 
 ## Custom domain for the frontend
 The frontend stack supports a custom domain through CDK context or environment variables. This sets up:
@@ -144,6 +177,11 @@ export SMOKE_TEST_PDF=/path/to/file.pdf
 python3 -m pip install -r backend/pipeline/requirements-dev.txt
 cd backend/pipeline
 pytest
+```
+
+```
+cd backend/api
+npm test
 ```
 
 ## Optional seed script

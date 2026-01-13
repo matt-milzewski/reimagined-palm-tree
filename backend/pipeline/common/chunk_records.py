@@ -1,0 +1,45 @@
+import hashlib
+from typing import Dict, Optional
+
+
+def normalize_text(text: str) -> str:
+    return " ".join(text.split())
+
+
+def compute_content_hash(doc_id: str, page: Optional[int], chunk_index: int, text: str) -> str:
+    normalized = normalize_text(text)
+    base = f"{doc_id}|{page or 0}|{chunk_index}|{normalized}"
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()
+
+
+def build_chunk_record(
+    *,
+    tenant_id: str,
+    dataset_id: str,
+    doc_id: str,
+    source_uri: str,
+    filename: str,
+    page: Optional[int],
+    chunk_index: int,
+    text: str,
+    created_at: str,
+    embedding_model: str,
+    acl: Optional[list] = None
+) -> Dict:
+    chunk_id = f"{doc_id}#p{page or 0}#c{chunk_index}"
+    content_hash = compute_content_hash(doc_id, page, chunk_index, text)
+    return {
+        "tenant_id": tenant_id,
+        "dataset_id": dataset_id,
+        "doc_id": doc_id,
+        "source_uri": source_uri,
+        "filename": filename,
+        "page": page,
+        "chunk_id": chunk_id,
+        "chunk_index": chunk_index,
+        "text": text,
+        "created_at": created_at,
+        "embedding_model": embedding_model,
+        "content_hash": content_hash,
+        "acl": acl or []
+    }

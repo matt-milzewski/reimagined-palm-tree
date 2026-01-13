@@ -1,6 +1,6 @@
 import json
 
-from common.ddb import update_job, update_file, put_audit, now_iso
+from common.ddb import update_job, update_file, update_dataset, put_audit, now_iso
 
 
 def extract_error(event):
@@ -46,6 +46,9 @@ def handler(event, _context):
                 "status": "FAILED"
             }
         )
+
+    if tenant_id and dataset_id:
+        update_dataset(tenant_id, dataset_id, {"status": "FAILED"})
 
     if tenant_id and dataset_id and file_id:
         put_audit(tenant_id, "JOB_FAILED", {"datasetId": dataset_id, "fileId": file_id, "jobId": job_id, "error": message})

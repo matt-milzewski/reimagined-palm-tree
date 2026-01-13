@@ -7,14 +7,17 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 import { StorageStack } from './storage-stack';
 import { AuthStack } from './auth-stack';
+import { VectorStack } from './vector-stack';
 
 interface ApiStackProps extends cdk.StackProps {
   storage: StorageStack;
   auth: AuthStack;
+  vector: VectorStack;
 }
 
 export class ApiStack extends cdk.Stack {
   public readonly api: apigateway.RestApi;
+  public readonly apiRoleArn: string;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -25,6 +28,15 @@ export class ApiStack extends cdk.Stack {
       'mattmilzewski@gmail.com';
     const contactFromEmail =
       this.node.tryGetContext('contactFromEmail') || process.env.CONTACT_FROM_EMAIL || contactRecipientEmail;
+
+    const embedModelId =
+      this.node.tryGetContext('bedrockEmbedModelId') ||
+      process.env.BEDROCK_EMBED_MODEL_ID ||
+      'amazon.titan-embed-text-v1';
+    const embeddingDimension =
+      this.node.tryGetContext('embeddingDimension') ||
+      process.env.EMBEDDING_DIMENSION ||
+      '1536';
 
     const apiFn = new NodejsFunction(this, 'ApiHandler', {
       entry: path.join(__dirname, '../../backend/api/src/handler.ts'),
@@ -39,7 +51,11 @@ export class ApiStack extends cdk.Stack {
         RAW_BUCKET: props.storage.rawBucket.bucketName,
         PROCESSED_BUCKET: props.storage.processedBucket.bucketName,
         CONTACT_RECIPIENT_EMAIL: contactRecipientEmail,
-        CONTACT_FROM_EMAIL: contactFromEmail
+        CONTACT_FROM_EMAIL: contactFromEmail,
+        OPENSEARCH_COLLECTION_ENDPOINT: props.vector.collectionEndpoint,
+        OPENSEARCH_INDEX_NAME: props.vector.indexName,
+        BEDROCK_EMBED_MODEL_ID: embedModelId,
+        EMBEDDING_DIMENSION: embeddingDimension
       }
     });
 
@@ -56,6 +72,18 @@ export class ApiStack extends cdk.Stack {
           `arn:aws:ses:${this.region}:${this.account}:identity/${contactFromEmail}`,
           `arn:aws:ses:${this.region}:${this.account}:configuration-set/*`
         ]
+      })
+    );
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [`arn:aws:bedrock:${this.region}::foundation-model/${embedModelId}`]
+      })
+    );
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['aoss:APIAccessAll'],
+        resources: [props.vector.collectionArn]
       })
     );
 
@@ -89,6 +117,7 @@ export class ApiStack extends cdk.Stack {
     });
 
     this.api = api;
+    this.apiRoleArn = apiFn.role?.roleArn || '';
 
     new cdk.CfnOutput(this, 'ApiUrl', { value: api.url });
   }

@@ -4,17 +4,26 @@
   "private": true,
   "main": "dist/handler.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test -r ts-node/register tests/*.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.540.0",
     "@aws-sdk/client-dynamodb": "^3.540.0",
     "@aws-sdk/client-s3": "^3.540.0",
     "@aws-sdk/client-sesv2": "^3.966.0",
+    "@aws-sdk/credential-provider-node": "^3.540.0",
+    "@aws-sdk/hash-node": "^3.374.0",
     "@aws-sdk/lib-dynamodb": "^3.540.0",
-    "@aws-sdk/s3-request-presigner": "^3.540.0"
+    "@aws-sdk/node-http-handler": "^3.374.0",
+    "@aws-sdk/protocol-http": "^3.374.0",
+    "@aws-sdk/s3-request-presigner": "^3.540.0",
+    "@aws-sdk/signature-v4": "^3.374.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.137",
+    "@types/node": "^20.11.30",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   }
 }
