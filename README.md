@@ -155,7 +155,7 @@ npm --prefix infra run cdk -- deploy RagReadinessFrontendStack --require-approva
 Make sure the hosted zone exists in Route53 and the domain is using the Route53 name servers.
 
 ## Smoke test
-The smoke test signs in, creates a dataset, uploads a PDF, waits for completion, and prints the readiness score.
+The smoke test signs in, creates a dataset, uploads a PDF, waits for completion, prints the readiness score, and runs a vector search query against the new index.
 
 ```
 export AWS_REGION=ap-southeast-2

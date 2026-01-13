@@ -159,6 +159,32 @@ def main():
 
     print("Readiness score:", report.get("readinessScore"))
 
+    query_payload = {
+        "dataset_id": dataset_id,
+        "query": "What is this document about?",
+        "top_k": 5
+    }
+
+    results = []
+    for attempt in range(5):
+        try:
+            search = api_request("POST", f"{api_base}/rag/query", token=token, payload=query_payload)
+            results = search.get("results", [])
+            if results:
+                break
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8")
+            raise SystemExit(f"RAG query failed: {error.code} {body}") from error
+        time.sleep(3)
+
+    if not results:
+        raise SystemExit("RAG query returned no results.")
+
+    top = results[0]
+    print("Top RAG result score:", top.get("score"))
+    citation = top.get("citation", {})
+    print("Top RAG result source:", citation.get("filename"), citation.get("page"))
+
 
 if __name__ == "__main__":
     main()
