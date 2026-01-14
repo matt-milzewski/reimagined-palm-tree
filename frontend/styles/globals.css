@@ -326,6 +326,59 @@ main {
   margin-bottom: 8px;
 }
 
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'Bricolage Grotesque', sans-serif;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.stat-subtitle {
+  font-size: 11px;
+  color: var(--concrete);
+  margin-top: 2px;
+}
+
+/* Dataset Stats */
+.dataset-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.dataset-stat {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dataset-stat strong {
+  color: var(--ink);
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

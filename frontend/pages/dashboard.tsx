@@ -14,12 +14,30 @@ function DatasetSkeleton() {
   );
 }
 
+function StatCard({ label, value, subtitle }: { label: string; value: string | number; subtitle?: string }) {
+  return (
+    <div className="stat-card">
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+      {subtitle && <div className="stat-subtitle">{subtitle}</div>}
+    </div>
+  );
+}
+
 type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
+type DatasetStats = {
+  fileCount: number;
+  readyCount: number;
+  processingCount: number;
+  failedCount: number;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [datasets, setDatasets] = useState<any[]>([]);
+  const [datasetStats, setDatasetStats] = useState<Record<string, DatasetStats>>({});
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isLoadingDatasets, setIsLoadingDatasets] = useState(true);
@@ -63,11 +81,50 @@ export default function DashboardPage() {
     setIsLoadingDatasets(true);
     try {
       const result = await apiRequest<{ datasets: any[] }>('/datasets', { accessToken: token });
-      setDatasets(result.datasets || []);
+      const loadedDatasets = result.datasets || [];
+      setDatasets(loadedDatasets);
+
+      // Load file stats for each dataset in parallel
+      const statsPromises = loadedDatasets.map(async (dataset) => {
+        try {
+          const filesResult = await apiRequest<{ files: any[] }>(
+            `/datasets/${dataset.datasetId}/files`,
+            { accessToken: token }
+          );
+          const files = filesResult.files || [];
+          return {
+            datasetId: dataset.datasetId,
+            stats: {
+              fileCount: files.length,
+              readyCount: files.filter((f) => f.status === 'READY').length,
+              processingCount: files.filter((f) => f.status === 'PROCESSING').length,
+              failedCount: files.filter((f) => f.status === 'FAILED').length,
+            },
+          };
+        } catch {
+          return { datasetId: dataset.datasetId, stats: { fileCount: 0, readyCount: 0, processingCount: 0, failedCount: 0 } };
+        }
+      });
+
+      const statsResults = await Promise.all(statsPromises);
+      const statsMap: Record<string, DatasetStats> = {};
+      statsResults.forEach(({ datasetId, stats }) => {
+        statsMap[datasetId] = stats;
+      });
+      setDatasetStats(statsMap);
     } finally {
       setIsLoadingDatasets(false);
     }
   };
+
+  // Calculate aggregate stats
+  const aggregateStats = useMemo(() => {
+    const totalFiles = Object.values(datasetStats).reduce((sum, s) => sum + s.fileCount, 0);
+    const totalReady = Object.values(datasetStats).reduce((sum, s) => sum + s.readyCount, 0);
+    const totalProcessing = Object.values(datasetStats).reduce((sum, s) => sum + s.processingCount, 0);
+    const totalFailed = Object.values(datasetStats).reduce((sum, s) => sum + s.failedCount, 0);
+    return { totalFiles, totalReady, totalProcessing, totalFailed };
+  }, [datasetStats]);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -105,6 +162,20 @@ export default function DashboardPage() {
           <h1 className="page-title">Datasets</h1>
           <p className="page-subtitle">Create datasets to organize ingestion jobs.</p>
         </div>
+
+        {/* Stats Summary */}
+        {!isLoadingDatasets && datasets.length > 0 && (
+          <div className="stats-grid" style={{ marginBottom: 20 }}>
+            <StatCard label="Datasets" value={datasets.length} />
+            <StatCard label="Total Files" value={aggregateStats.totalFiles} />
+            <StatCard
+              label="Ready"
+              value={aggregateStats.totalReady}
+              subtitle={aggregateStats.totalFiles > 0 ? `${Math.round((aggregateStats.totalReady / aggregateStats.totalFiles) * 100)}%` : undefined}
+            />
+            <StatCard label="Processing" value={aggregateStats.totalProcessing} />
+          </div>
+        )}
 
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -185,21 +256,40 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : (
-            filteredDatasets.map((dataset) => (
-              <div className="card" key={dataset.datasetId}>
-                <h3 style={{ marginTop: 0 }}>{dataset.name}</h3>
-                <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-                  Created {new Date(dataset.createdAt).toLocaleDateString()}
+            filteredDatasets.map((dataset) => {
+              const stats = datasetStats[dataset.datasetId];
+              return (
+                <div className="card" key={dataset.datasetId}>
+                  <h3 style={{ marginTop: 0 }}>{dataset.name}</h3>
+                  <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 8 }}>
+                    Created {new Date(dataset.createdAt).toLocaleDateString()}
+                  </div>
+                  {stats && (
+                    <div className="dataset-stats">
+                      <span className="dataset-stat">
+                        <strong>{stats.fileCount}</strong> files
+                      </span>
+                      {stats.readyCount > 0 && (
+                        <span className="badge success">{stats.readyCount} ready</span>
+                      )}
+                      {stats.processingCount > 0 && (
+                        <span className="badge info">{stats.processingCount} processing</span>
+                      )}
+                      {stats.failedCount > 0 && (
+                        <span className="badge critical">{stats.failedCount} failed</span>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    className="btn secondary"
+                    style={{ marginTop: 16 }}
+                    onClick={() => router.push(`/dataset?datasetId=${dataset.datasetId}`)}
+                  >
+                    View dataset
+                  </button>
                 </div>
-                <button
-                  className="btn secondary"
-                  style={{ marginTop: 16 }}
-                  onClick={() => router.push(`/dataset?datasetId=${dataset.datasetId}`)}
-                >
-                  View dataset
-                </button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </main>
