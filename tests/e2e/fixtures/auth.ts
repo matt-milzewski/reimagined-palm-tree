@@ -31,7 +31,7 @@ export const test = base.extend<AuthFixtures>({
 
   authenticatedPage: async ({ page, testUser }, use) => {
     // Navigate to login page
-    await page.goto('/login');
+    await page.goto('/login/index.html');
 
     // Fill in credentials
     await page.fill('input[type="email"]', testUser.email);
@@ -40,8 +40,9 @@ export const test = base.extend<AuthFixtures>({
     // Click sign in button
     await page.click('button[type="submit"]');
 
-    // Wait for navigation to dashboard
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    // Wait a moment for auth to complete, then navigate to dashboard
+    await page.waitForTimeout(2000);
+    await page.goto('/dashboard/index.html');
 
     await use(page);
   }

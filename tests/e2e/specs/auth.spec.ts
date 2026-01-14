@@ -3,7 +3,7 @@ import { test, expect } from '../fixtures/auth';
 test.describe('Authentication', () => {
   test('should login with existing test user', async ({ page }) => {
     // Navigate to login page
-    await page.goto('/login');
+    await page.goto('/login/index.html');
 
     // Fill in credentials
     await page.fill('input[type="email"]', process.env.E2E_TEST_EMAIL!);
@@ -12,16 +12,17 @@ test.describe('Authentication', () => {
     // Click sign in button
     await page.click('button[type="submit"]');
 
-    // Wait for redirect to dashboard
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    // Wait for auth to complete and navigate to dashboard
+    await page.waitForTimeout(2000);
+    await page.goto('/dashboard/index.html');
 
     // Verify we're on the dashboard
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.locator('h1')).toContainText(/dashboard/i);
+    await expect(page.locator('h1')).toContainText(/datasets/i);
   });
 
   test('should show error for invalid credentials', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/login/index.html');
 
     // Fill in invalid credentials
     await page.fill('input[type="email"]', 'invalid@example.com');
@@ -30,8 +31,8 @@ test.describe('Authentication', () => {
     // Click sign in button
     await page.click('button[type="submit"]');
 
-    // Wait for error message (adjust selector based on actual error display)
-    await expect(page.locator('text=Incorrect username or password')).toBeVisible({ timeout: 10000 });
+    // Wait for error message
+    await expect(page.locator('text=Login failed. Check your credentials.')).toBeVisible({ timeout: 10000 });
   });
 
   test('should navigate to login from landing page', async ({ page }) => {

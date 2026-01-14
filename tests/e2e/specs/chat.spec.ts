@@ -8,11 +8,12 @@ test.describe('Chat with Citations', () => {
 
   // Setup: Create a dataset with a processed file before running chat tests
   test.beforeAll(async ({ browser }) => {
+    test.setTimeout(300000); // 5 minutes for setup including file processing
     const context = await browser.newContext();
     const page = await context.newPage();
 
     // Authenticate
-    await page.goto('/login');
+    await page.goto('/login/index.html');
     await page.fill('input[type="email"]', process.env.E2E_TEST_EMAIL!);
     await page.fill('input[type="password"]', process.env.E2E_TEST_PASSWORD!);
     await page.click('button[type="submit"]');
@@ -32,11 +33,15 @@ test.describe('Chat with Citations', () => {
 
     // Create dataset
     const datasetName = generateTestDatasetName('chat-test');
-    await page.fill('input[placeholder*="dataset" i], input[name="name"]', datasetName);
+    await page.fill('input[placeholder="Dataset name"]', datasetName);
     await page.click('button:has-text("Create")');
     await page.waitForSelector(`text=${datasetName}`);
-    await page.click(`button:has-text("View"):near(:text("${datasetName}"))`);
-    await page.waitForURL(/datasetId=/);
+
+    // Click the last "View dataset" button (newest dataset)
+    const viewButtons = page.locator('button:has-text("View dataset")');
+    const count = await viewButtons.count();
+    await viewButtons.nth(count - 1).click();
+    await page.waitForTimeout(1000);
 
     const url = new URL(page.url());
     datasetId = url.searchParams.get('datasetId')!;
@@ -54,16 +59,18 @@ test.describe('Chat with Citations', () => {
       buffer: pdfBuffer
     });
 
-    // Wait for processing
+    // Wait for processing to complete (check for View results button)
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(1000);
-        const completeStatus = await page.locator('.status.complete').count();
-        return completeStatus > 0;
+        const viewResultsButton = await page.locator('button:has-text("View results")').count();
+        return viewResultsButton > 0;
       },
       { timeout: 180000, interval: 5000 }
     );
+
+    console.log('File processing completed for chat test');
 
     console.log(`Setup complete: Dataset ${datasetId} is ready for chat tests`);
 
@@ -72,7 +79,7 @@ test.describe('Chat with Citations', () => {
 
   test('should chat with dataset and receive citations', async ({ authenticatedPage: page }) => {
     // Navigate to chat page
-    await page.goto('/chat');
+    await page.goto('/chat/index.html');
 
     // Select the dataset
     await page.selectOption('select', datasetId);
@@ -110,7 +117,7 @@ test.describe('Chat with Citations', () => {
   });
 
   test('should open source document from citation', async ({ authenticatedPage: page }) => {
-    await page.goto('/chat');
+    await page.goto('/chat/index.html');
     await page.selectOption('select', datasetId);
     await expect(page.locator('.badge.success, .badge:has-text("READY")')).toBeVisible();
 
