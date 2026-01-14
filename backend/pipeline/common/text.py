@@ -1,9 +1,22 @@
 import re
 from collections import Counter
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
+
+
+# Construction abbreviations that should not be dehyphenated
+PROTECTED_ABBREVIATIONS: Set[str] = {
+    "SWMS", "JSA", "WHS", "OHS", "PCBU", "PPE", "SDS", "MSDS", "TBT", "HSE",
+    "ITP", "ITR", "QA", "QC", "NCR", "CAR", "FAT", "SAT",
+    "EOT", "VO", "VR", "PC", "DLP", "LOD", "BQ", "BOQ", "SOW", "NTA", "SI",
+    "RFI", "TQ", "TBE", "TBC", "TBA", "NTS", "AFC", "IFC", "IFR",
+    "WBS", "CPM", "EVM", "PMO", "RFP", "RFQ", "NCC", "BCA",
+    "MEP", "HVAC", "FHR", "SWD", "HWS", "CWS", "DB", "MCC", "VSD", "VFD",
+    "AS", "NZS",  # Standards prefixes
+}
 
 
 def normalize_whitespace(text: str) -> str:
+    """Normalize whitespace while preserving document structure."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -11,7 +24,34 @@ def normalize_whitespace(text: str) -> str:
 
 
 def dehyphenate(text: str) -> str:
-    return re.sub(r"([A-Za-z])\-\n([A-Za-z])", r"\1\2", text)
+    """
+    Remove hyphens at line breaks while preserving construction abbreviations.
+
+    This function is construction-aware and will not dehyphenate text that
+    appears to be a construction abbreviation or standard reference.
+    """
+    def should_dehyphenate(match: re.Match) -> str:
+        before = match.group(1)
+        after = match.group(2)
+        combined = before + after
+
+        # Check if this might be part of a protected abbreviation
+        # Look at the context before the hyphen
+        start_pos = match.start()
+        context_before = text[max(0, start_pos - 10):start_pos + 1].upper()
+
+        # Don't dehyphenate if it looks like a standard reference (AS-NZS, etc.)
+        if re.search(r'\b(AS|NZS|BCA|NCC)\s*[-/]?\s*$', context_before):
+            return match.group(0)  # Keep original
+
+        # Check if the result would form a protected abbreviation
+        for abbr in PROTECTED_ABBREVIATIONS:
+            if abbr in combined.upper() or combined.upper() in abbr:
+                return match.group(0)  # Keep original
+
+        return before + after
+
+    return re.sub(r"([A-Za-z])\-\n([A-Za-z])", should_dehyphenate, text)
 
 
 def split_lines(text: str) -> List[str]:

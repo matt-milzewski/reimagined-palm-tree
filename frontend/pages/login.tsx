@@ -20,9 +20,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated]);
 
   const resetMessages = () => {
     setError('');
@@ -46,7 +46,7 @@ export default function LoginPage() {
     try {
       resetMessages();
       await login(email, password);
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (err) {
       setError('Login failed. Check your credentials.');
     }
@@ -166,26 +166,36 @@ export default function LoginPage() {
             <>
               <h3 style={{ marginTop: 0 }}>Sign in</h3>
               <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-                <input
-                  className="input"
-                  placeholder="Email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  required
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <input
-                  className="input"
-                  placeholder="Password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  required
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                {info && <div style={{ color: 'var(--accent-strong)' }}>{info}</div>}
-                {error && <div style={{ color: 'var(--critical)' }}>{error}</div>}
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label htmlFor="login-email" className="field-label">Email</label>
+                  <input
+                    id="login-email"
+                    className="input"
+                    placeholder="Enter your email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    required
+                    aria-required="true"
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label htmlFor="login-password" className="field-label">Password</label>
+                  <input
+                    id="login-password"
+                    className="input"
+                    placeholder="Enter your password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    required
+                    aria-required="true"
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                {info && <div style={{ color: 'var(--accent-strong)' }} role="status">{info}</div>}
+                {error && <div style={{ color: 'var(--critical)' }} role="alert">{error}</div>}
                 <button className="btn" type="submit" disabled={loading || busy}>
                   {loading ? 'Signing in...' : 'Sign in'}
                 </button>
@@ -205,26 +215,36 @@ export default function LoginPage() {
             <>
               <h3 style={{ marginTop: 0 }}>Create account</h3>
               <form onSubmit={handleSignUp} style={{ display: 'grid', gap: 12 }}>
-                <input
-                  className="input"
-                  placeholder="Email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  required
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <input
-                  className="input"
-                  placeholder="Password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  required
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                {info && <div style={{ color: 'var(--accent-strong)' }}>{info}</div>}
-                {error && <div style={{ color: 'var(--critical)' }}>{error}</div>}
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label htmlFor="signup-email" className="field-label">Email</label>
+                  <input
+                    id="signup-email"
+                    className="input"
+                    placeholder="Enter your email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    required
+                    aria-required="true"
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <label htmlFor="signup-password" className="field-label">Password</label>
+                  <input
+                    id="signup-password"
+                    className="input"
+                    placeholder="Create a password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    required
+                    aria-required="true"
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                {info && <div style={{ color: 'var(--accent-strong)' }} role="status">{info}</div>}
+                {error && <div style={{ color: 'var(--critical)' }} role="alert">{error}</div>}
                 <button className="btn" type="submit" disabled={busy}>
                   {busy ? 'Creating...' : 'Create account'}
                 </button>

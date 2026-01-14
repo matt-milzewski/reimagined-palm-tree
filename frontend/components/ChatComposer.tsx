@@ -23,7 +23,11 @@ export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
 
   return (
     <div className="chat-composer">
+      <label htmlFor="chat-message-input" className="sr-only">
+        Message
+      </label>
       <textarea
+        id="chat-message-input"
         className="input chat-input"
         placeholder="Ask about the selected dataset..."
         rows={3}
@@ -31,8 +35,14 @@ export function ChatComposer({ disabled, onSend }: ChatComposerProps) {
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
+        aria-label="Type your message"
       />
-      <button className="btn" onClick={handleSend} disabled={disabled || !value.trim()}>
+      <button
+        className="btn"
+        onClick={handleSend}
+        disabled={disabled || !value.trim()}
+        aria-label="Send message"
+      >
         Send
       </button>
     </div>

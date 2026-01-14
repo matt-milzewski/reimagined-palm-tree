@@ -57,15 +57,27 @@ export function ChatThread({ messages, selectedMessageId, onSelectMessage, onRet
             </div>
             {message.role === 'assistant' && (
               <div className="chat-actions">
-                <button className="btn secondary" onClick={() => handleCopy(message.content || '')}>
+                <button
+                  className="btn secondary"
+                  onClick={() => handleCopy(message.content || '')}
+                  aria-label="Copy message to clipboard"
+                >
                   Copy
                 </button>
                 {message.status === 'error' && (
-                  <button className="btn" onClick={() => onRetry(message.id)}>
+                  <button
+                    className="btn"
+                    onClick={() => onRetry(message.id)}
+                    aria-label="Retry sending this message"
+                  >
                     Retry
                   </button>
                 )}
-                <button className="btn ghost" onClick={() => onSelectMessage(message.id)}>
+                <button
+                  className="btn ghost"
+                  onClick={() => onSelectMessage(message.id)}
+                  aria-label="View citations for this message"
+                >
                   Citations
                 </button>
               </div>

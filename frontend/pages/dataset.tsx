@@ -10,27 +10,49 @@ type UploadState = {
   status: string;
 };
 
+function FileTableSkeleton() {
+  return (
+    <>
+      {[1, 2, 3].map((i) => (
+        <tr key={i}>
+          <td><div className="skeleton skeleton-cell name" /></td>
+          <td><div className="skeleton skeleton-cell status" /></td>
+          <td><div className="skeleton skeleton-cell id" /></td>
+          <td><div className="skeleton skeleton-cell button" /></td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function DatasetPage() {
   const router = useRouter();
+  const { isReady } = router;
   const { datasetId } = router.query;
-  const datasetKey = Array.isArray(datasetId) ? datasetId[0] : datasetId;
+  const datasetKey = isReady ? (Array.isArray(datasetId) ? datasetId[0] : datasetId) : undefined;
   const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [files, setFiles] = useState<any[]>([]);
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [error, setError] = useState('');
+  const [isLoadingFiles, setIsLoadingFiles] = useState(true);
 
   const loadFiles = async () => {
     const token = idToken || accessToken;
     if (!datasetKey || !token) return;
-    const result = await apiRequest<{ files: any[] }>(`/datasets/${datasetKey}/files`, { accessToken: token });
-    setFiles(result.files || []);
+    setIsLoadingFiles(true);
+    try {
+      const result = await apiRequest<{ files: any[] }>(`/datasets/${datasetKey}/files`, { accessToken: token });
+      setFiles(result.files || []);
+    } finally {
+      setIsLoadingFiles(false);
+    }
   };
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace('/login');
     }
-  }, [loading, isAuthenticated, router]);
+  }, [loading, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated && datasetKey) {
@@ -124,8 +146,18 @@ export default function DatasetPage() {
 
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input type="file" accept="application/pdf" multiple onChange={handleUpload} />
-            <button className="btn secondary" onClick={loadFiles}>Refresh</button>
+            <label htmlFor="file-upload" className="sr-only">Upload PDF files</label>
+            <input
+              id="file-upload"
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={handleUpload}
+              aria-label="Upload PDF files"
+            />
+            <button className="btn secondary" onClick={loadFiles} aria-label="Refresh file list">
+              Refresh
+            </button>
           </div>
           {error && <div style={{ color: 'var(--critical)', marginTop: 12 }}>{error}</div>}
 
@@ -164,23 +196,33 @@ export default function DatasetPage() {
               </tr>
             </thead>
             <tbody>
-              {files.map((file) => (
-                <tr key={file.fileId}>
-                  <td>{file.filename}</td>
-                  <td className={`status ${file.status?.toLowerCase()}`}>{file.status}</td>
-                  <td>{file.latestJobId || '-'}</td>
-                  <td>
-                    {file.latestJobId && (
-                      <button
-                        className="btn secondary"
-                        onClick={() => router.push(`/file?datasetId=${datasetKey}&fileId=${file.fileId}`)}
-                      >
-                        View results
-                      </button>
-                    )}
+              {isLoadingFiles ? (
+                <FileTableSkeleton />
+              ) : files.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>
+                    No files uploaded yet. Use the file input above to upload PDFs.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                files.map((file) => (
+                  <tr key={file.fileId}>
+                    <td>{file.filename}</td>
+                    <td className={`status ${file.status?.toLowerCase()}`}>{file.status}</td>
+                    <td>{file.latestJobId || '-'}</td>
+                    <td>
+                      {file.latestJobId && (
+                        <button
+                          className="btn secondary"
+                          onClick={() => router.push(`/file?datasetId=${datasetKey}&fileId=${file.fileId}`)}
+                        >
+                          View results
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

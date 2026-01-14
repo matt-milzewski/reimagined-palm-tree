@@ -30,9 +30,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace('/login');
     }
-  }, [loading, isAuthenticated, router]);
+  }, [loading, isAuthenticated]);
 
   const datasetStatus = selectedDataset?.status;
   const datasetReady = datasetStatus === 'READY';

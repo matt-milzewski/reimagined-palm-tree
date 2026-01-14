@@ -1,5 +1,12 @@
 import hashlib
-from typing import Dict, Optional
+from typing import Dict, List, Optional
+
+from common.construction import (
+    classify_document,
+    detect_discipline,
+    extract_standards,
+    extract_section_reference
+)
 
 
 def normalize_text(text: str) -> str:
@@ -24,11 +31,13 @@ def build_chunk_record(
     text: str,
     created_at: str,
     embedding_model: str,
-    acl: Optional[list] = None
+    acl: Optional[list] = None,
+    include_construction_metadata: bool = True
 ) -> Dict:
     chunk_id = f"{doc_id}#p{page or 0}#c{chunk_index}"
     content_hash = compute_content_hash(doc_id, page, chunk_index, text)
-    return {
+
+    record = {
         "tenant_id": tenant_id,
         "dataset_id": dataset_id,
         "doc_id": doc_id,
@@ -43,3 +52,18 @@ def build_chunk_record(
         "content_hash": content_hash,
         "acl": acl or []
     }
+
+    # Add construction-specific metadata for Australian construction industry
+    if include_construction_metadata:
+        doc_type, doc_type_confidence = classify_document(text)
+        discipline = detect_discipline(text)
+        standards = extract_standards(text)
+        section_ref = extract_section_reference(text)
+
+        record["doc_type"] = doc_type
+        record["doc_type_confidence"] = doc_type_confidence
+        record["discipline"] = discipline
+        record["standards_referenced"] = standards
+        record["section_reference"] = section_ref
+
+    return record

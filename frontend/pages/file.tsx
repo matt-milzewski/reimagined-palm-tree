@@ -8,31 +8,39 @@ const severityOrder = ['CRITICAL', 'WARN', 'INFO'];
 
 export default function FileResultsPage() {
   const router = useRouter();
+  const { isReady } = router;
   const { datasetId, fileId } = router.query;
-  const datasetKey = Array.isArray(datasetId) ? datasetId[0] : datasetId;
-  const fileKey = Array.isArray(fileId) ? fileId[0] : fileId;
+  const datasetKey = isReady ? (Array.isArray(datasetId) ? datasetId[0] : datasetId) : undefined;
+  const fileKey = isReady ? (Array.isArray(fileId) ? fileId[0] : fileId) : undefined;
   const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [file, setFile] = useState<any>(null);
   const [job, setJob] = useState<any>(null);
   const [qualityReport, setQualityReport] = useState<any>(null);
   const [error, setError] = useState('');
+  const [isLoadingFile, setIsLoadingFile] = useState(true);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
 
   const loadFile = async () => {
     const token = idToken || accessToken;
     if (!datasetKey || !fileKey || !token) return;
-    const result = await apiRequest<{ file: any; job: any }>(
-      `/datasets/${datasetKey}/files/${fileKey}`,
-      { accessToken: token }
-    );
-    setFile(result.file);
-    setJob(result.job);
+    setIsLoadingFile(true);
+    try {
+      const result = await apiRequest<{ file: any; job: any }>(
+        `/datasets/${datasetKey}/files/${fileKey}`,
+        { accessToken: token }
+      );
+      setFile(result.file);
+      setJob(result.job);
+    } finally {
+      setIsLoadingFile(false);
+    }
   };
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace('/login');
     }
-  }, [loading, isAuthenticated, router]);
+  }, [loading, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated && datasetKey && fileKey) {
@@ -45,16 +53,21 @@ export default function FileResultsPage() {
       const token = idToken || accessToken;
       if (!datasetKey || !fileKey || !job?.jobId || !token) return;
       if (job.status !== 'COMPLETE') return;
-      const { url } = await apiRequest<{ url: string }>(
-        `/datasets/${datasetKey}/files/${fileKey}/jobs/${job.jobId}/download?type=quality`,
-        { accessToken: token }
-      );
-      const response = await fetch(url);
-      const report = await response.json();
-      setQualityReport(report);
+      setIsLoadingReport(true);
+      try {
+        const { url } = await apiRequest<{ url: string }>(
+          `/datasets/${datasetKey}/files/${fileKey}/jobs/${job.jobId}/download?type=quality`,
+          { accessToken: token }
+        );
+        const response = await fetch(url);
+        const report = await response.json();
+        setQualityReport(report);
+      } finally {
+        setIsLoadingReport(false);
+      }
     };
 
-    loadQualityReport().catch(() => undefined);
+    loadQualityReport().catch(() => setIsLoadingReport(false));
   }, [job?.jobId, job?.status, datasetKey, fileKey, idToken, accessToken]);
 
   const groupedFindings = useMemo(() => {
@@ -87,18 +100,28 @@ export default function FileResultsPage() {
           <p className="page-subtitle">{file?.filename}</p>
         </div>
 
-        {error && <div style={{ color: 'var(--critical)', marginBottom: 12 }}>{error}</div>}
+        {error && <div style={{ color: 'var(--critical)', marginBottom: 12 }} role="alert">{error}</div>}
 
         <div className="grid two" style={{ marginBottom: 20 }}>
           <div className="card">
             <h3 style={{ marginTop: 0 }}>Readiness score</h3>
-            <div style={{ fontSize: 48, fontWeight: 700 }}>{job?.readinessScore ?? '--'}</div>
+            {isLoadingFile ? (
+              <div className="skeleton" style={{ height: 48, width: 80 }} />
+            ) : (
+              <div style={{ fontSize: 48, fontWeight: 700 }}>{job?.readinessScore ?? '--'}</div>
+            )}
             <div style={{ color: 'var(--muted)' }}>0 - 100 scale</div>
           </div>
           <div className="card">
             <h3 style={{ marginTop: 0 }}>Status</h3>
-            <div className={`status ${file?.status?.toLowerCase()}`}>{file?.status}</div>
-            {job?.errorMessage && <div style={{ color: 'var(--critical)' }}>{job.errorMessage}</div>}
+            {isLoadingFile ? (
+              <div className="skeleton" style={{ height: 24, width: 100 }} />
+            ) : (
+              <>
+                <div className={`status ${file?.status?.toLowerCase()}`}>{file?.status}</div>
+                {job?.errorMessage && <div style={{ color: 'var(--critical)' }}>{job.errorMessage}</div>}
+              </>
+            )}
           </div>
         </div>
 
@@ -114,24 +137,35 @@ export default function FileResultsPage() {
 
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Findings</h3>
-          <div className="findings">
-            {severityOrder.map((severity) => (
-              <div key={severity}>
-                <div className={`badge ${severity.toLowerCase()}`} style={{ marginBottom: 8 }}>
-                  {severity} ({groupedFindings[severity]?.length || 0})
-                </div>
-                {groupedFindings[severity]?.map((finding: any, index: number) => (
-                  <div key={`${severity}-${index}`} className="finding">
-                    <div style={{ fontWeight: 600 }}>{finding.type}</div>
-                    <div style={{ color: 'var(--muted)' }}>{finding.description}</div>
-                    {finding.recommendation && (
-                      <div style={{ marginTop: 6 }}>Recommendation: {finding.recommendation}</div>
-                    )}
+          {isLoadingReport ? (
+            <div className="loading-overlay">
+              <div className="loading-spinner" />
+              <span>Loading quality report...</span>
+            </div>
+          ) : !qualityReport ? (
+            <div style={{ color: 'var(--muted)', padding: 20, textAlign: 'center' }}>
+              {job?.status === 'COMPLETE' ? 'Quality report not available.' : 'Processing must complete before findings are available.'}
+            </div>
+          ) : (
+            <div className="findings">
+              {severityOrder.map((severity) => (
+                <div key={severity}>
+                  <div className={`badge ${severity.toLowerCase()}`} style={{ marginBottom: 8 }}>
+                    {severity} ({groupedFindings[severity]?.length || 0})
                   </div>
-                ))}
-              </div>
-            ))}
-          </div>
+                  {groupedFindings[severity]?.map((finding: any, index: number) => (
+                    <div key={`${severity}-${index}`} className="finding">
+                      <div style={{ fontWeight: 600 }}>{finding.type}</div>
+                      <div style={{ color: 'var(--muted)' }}>{finding.description}</div>
+                      {finding.recommendation && (
+                        <div style={{ marginTop: 6 }}>Recommendation: {finding.recommendation}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </>
