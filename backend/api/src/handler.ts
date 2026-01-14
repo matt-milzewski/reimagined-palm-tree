@@ -102,15 +102,76 @@ type Citation = {
   snippet?: string;
   score?: number;
   doc_id?: string;
+  // Construction-specific metadata
+  doc_type?: string;
+  discipline?: string;
+  section_reference?: string;
+  standards_referenced?: string[];
 };
 
 const chatSystemPrompt = [
-  'You are RagReady, an assistant for construction teams.',
-  'Answer using only the provided sources.',
-  'If the sources do not contain the answer, say you do not know.',
-  'Prefer concise answers and bullet points where helpful.',
-  'Always add citations like [S1] at the end of relevant sentences.'
+  'You are RagReady, an AI assistant specializing in Australian construction documentation.',
+  '',
+  'CONTEXT:',
+  '- You assist construction professionals (project managers, site supervisors, engineers, estimators, contract administrators)',
+  '- Documents include specifications, contracts, SWMS, ITPs, drawings, RFIs, variations, and correspondence',
+  '- Australian standards (AS, AS/NZS, BCA, NCC) are authoritative references',
+  '',
+  'RESPONSE GUIDELINES:',
+  '1. Always cite sources using [S1], [S2] format - cite at the end of each relevant sentence or claim',
+  '2. For safety-related queries, emphasize WHS requirements and highlight any hazards or controls mentioned',
+  '3. For contract queries, note if clauses reference other sections and flag any time-critical requirements',
+  '4. For technical specs, include relevant Australian standard references when mentioned in sources',
+  '5. If information appears dated, mention the document date if visible in sources',
+  '6. Prefer concise answers with bullet points for lists and step-by-step procedures',
+  '',
+  'CONSTRUCTION TERMINOLOGY (interpret these correctly):',
+  '- PC = Practical Completion (not Personal Computer)',
+  '- EOT = Extension of Time',
+  '- VO = Variation Order',
+  '- DLP = Defects Liability Period',
+  '- PCBU = Person Conducting Business or Undertaking (WHS Act)',
+  '- SWMS = Safe Work Method Statement',
+  '- ITP = Inspection Test Plan',
+  '- RFI = Request for Information',
+  '- NCC/BCA = National Construction Code / Building Code of Australia',
+  '- Head Contractor = Main/Principal Contractor',
+  '',
+  'If you cannot find the answer in the sources, say:',
+  '"I couldn\'t find this information in your uploaded documents. You may need to check [suggest document type] or contact [relevant party]."'
 ].join('\n');
+
+// Construction abbreviations for query expansion
+const CONSTRUCTION_ABBREVIATIONS: Record<string, string> = {
+  'SWMS': 'Safe Work Method Statement',
+  'ITP': 'Inspection Test Plan',
+  'EOT': 'Extension of Time',
+  'VO': 'Variation Order',
+  'PC': 'Practical Completion',
+  'DLP': 'Defects Liability Period',
+  'RFI': 'Request for Information',
+  'TQ': 'Technical Query',
+  'NCR': 'Non-Conformance Report',
+  'WHS': 'Work Health and Safety',
+  'PPE': 'Personal Protective Equipment',
+  'PCBU': 'Person Conducting Business or Undertaking',
+  'NCC': 'National Construction Code',
+  'BCA': 'Building Code of Australia',
+};
+
+function expandConstructionQuery(query: string): string {
+  let expanded = query;
+  // Expand known abbreviations in the query for better retrieval
+  for (const [abbr, full] of Object.entries(CONSTRUCTION_ABBREVIATIONS)) {
+    const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
+    if (regex.test(query)) {
+      // Add the expansion to improve semantic matching
+      expanded = `${expanded} (${full})`;
+      break; // Only expand the first match to avoid overly long queries
+    }
+  }
+  return expanded;
+}
 
 function normalizeSnippet(text: string, maxLength: number): string {
   const cleaned = text.replace(/\s+/g, ' ').trim();
@@ -131,16 +192,29 @@ function buildCitations(hits: any[]): { citations: Citation[]; sourcesText: stri
     const page = source.page ?? null;
     const pageLabel = page !== null && page !== undefined ? ` p${page}` : '';
 
+    // Extract construction metadata from the source
+    const docType = source.doc_type || undefined;
+    const discipline = source.discipline || undefined;
+    const sectionRef = source.section_reference || undefined;
+    const standards = source.standards_referenced || undefined;
+
     citations.push({
       chunk_id: source.chunk_id || hit._id,
       filename,
       page,
       doc_id: source.doc_id,
       score: hit._score ?? 0,
-      snippet
+      snippet,
+      doc_type: docType,
+      discipline: discipline,
+      section_reference: sectionRef,
+      standards_referenced: standards
     });
 
-    sources.push(`[S${index + 1}] ${filename}${pageLabel}\n${contextText}`);
+    // Build source label with document type if available
+    const docTypeLabel = docType ? ` [${docType.toUpperCase()}]` : '';
+    const sectionLabel = sectionRef ? ` §${sectionRef}` : '';
+    sources.push(`[S${index + 1}] ${filename}${docTypeLabel}${pageLabel}${sectionLabel}\n${contextText}`);
   });
 
   return { citations, sourcesText: sources.join('\n\n') };
@@ -698,7 +772,9 @@ async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyR
     })
   );
 
-  const vector = await embedQuery(message);
+  // Expand query with construction terminology for better retrieval
+  const expandedQuery = expandConstructionQuery(message);
+  const vector = await embedQuery(expandedQuery);
   const searchPayload = buildKnnQuery({
     tenantId,
     datasetId,

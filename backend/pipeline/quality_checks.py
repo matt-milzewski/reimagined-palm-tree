@@ -13,10 +13,10 @@ env = get_env()
 
 # Revision/version patterns for construction documents
 REVISION_PATTERNS = [
-    r"[Rr]ev(?:ision)?\.?\s*([A-Z0-9]+)",     # Rev A, Rev 1, Revision B
-    r"[Vv](?:ersion)?\.?\s*(\d+(?:\.\d+)*)",  # V1, V2.1, Version 3
-    r"[Ii]ssue\s*(\d+)",                       # Issue 1, Issue 2
-    r"[Aa]mendment\s*(\d+)",                   # Amendment 1
+    r"[Rr]ev(?:ision)?[-_.\s]*([A-Z0-9]+)",   # Rev A, Rev-A, Rev_A, Rev.A, Revision B
+    r"[Vv](?:ersion)?[-_.\s]*(\d+(?:\.\d+)*)", # V1, V2.1, Version 3, v_2
+    r"[Ii]ssue[-_\s]*(\d+)",                   # Issue 1, Issue-2, Issue_3
+    r"[Aa]mendment[-_\s]*(\d+)",               # Amendment 1, Amendment-2
 ]
 
 # Date patterns for Australian construction documents
@@ -110,11 +110,13 @@ def detect_drawing_document(text: str, filename: str) -> bool:
 
 def get_base_filename(filename: str) -> str:
     """Extract base filename without revision suffix for superseded detection."""
+    # Remove extension first
+    base = re.sub(r"\.\w+$", "", filename)
     # Remove common revision suffixes
-    base = re.sub(r"[-_\s]+[Rr]ev\.?\s*[A-Z0-9]+", "", filename)
-    base = re.sub(r"[-_\s]+[Vv](?:ersion)?\.?\s*\d+(?:\.\d+)*", "", base)
-    base = re.sub(r"[-_\s]+[Ii]ssue\s*\d+", "", base)
-    base = re.sub(r"\.\w+$", "", base)  # Remove extension
+    base = re.sub(r"[-_\s]+[Rr]ev(?:ision)?[-_.\s]*[A-Z0-9]+$", "", base, flags=re.IGNORECASE)
+    base = re.sub(r"[-_\s]+[Vv](?:ersion)?[-_.\s]*\d+(?:\.\d+)*$", "", base, flags=re.IGNORECASE)
+    base = re.sub(r"[-_\s]+[Ii]ssue[-_\s]*\d+$", "", base, flags=re.IGNORECASE)
+    base = re.sub(r"[-_\s]+[Aa]mendment[-_\s]*\d+$", "", base, flags=re.IGNORECASE)
     return base.strip()
 
 

@@ -8,6 +8,11 @@ export type Citation = {
   snippet?: string;
   score?: number;
   doc_id?: string;
+  // Construction-specific metadata
+  doc_type?: string;
+  discipline?: string;
+  section_reference?: string;
+  standards_referenced?: string[];
 };
 
 export type ChatMessage = {

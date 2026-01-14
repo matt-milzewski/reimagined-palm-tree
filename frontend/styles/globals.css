@@ -259,6 +259,73 @@ main {
   color: var(--accent-strong);
 }
 
+/* Construction document type badges */
+.badge.doc-type-specification,
+.badge.doc-type-spec {
+  background: rgba(30, 64, 175, 0.15);
+  color: var(--industrial-blue);
+}
+
+.badge.doc-type-contract {
+  background: rgba(139, 92, 246, 0.15);
+  color: #7c3aed;
+}
+
+.badge.doc-type-swms,
+.badge.doc-type-safety {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.badge.doc-type-itp,
+.badge.doc-type-quality {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.badge.doc-type-drawing {
+  background: rgba(99, 102, 241, 0.15);
+  color: #4f46e5;
+}
+
+.badge.doc-type-rfi,
+.badge.doc-type-variation {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+.badge.discipline {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--slate);
+}
+
+.badge.section {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.badge.standard {
+  background: rgba(255, 107, 44, 0.12);
+  color: var(--accent-strong);
+  font-size: 11px;
+}
+
+/* Citation metadata layout */
+.citation-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.citation-standards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -598,6 +665,16 @@ main {
   .chat-thread {
     max-height: 50vh;
   }
+
+  .citations-panel {
+    order: -1;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .grid.two {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -605,6 +682,64 @@ main {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  main {
+    padding: 20px 16px 40px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .chat-bubble {
+    max-width: 95%;
+  }
+
+  .chat-composer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-composer .btn {
+    width: 100%;
+  }
+
+  .input, .chat-input, select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  .citation-item {
+    padding: 12px;
+  }
+
+  .citation-metadata {
+    gap: 4px;
+  }
+
+  .badge {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-header select {
+    width: 100%;
+  }
+
+  .file-table th:nth-child(3),
+  .file-table td:nth-child(3) {
+    display: none; /* Hide less important columns on very small screens */
   }
 }
 

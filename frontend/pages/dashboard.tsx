@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiRequest } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -14,6 +14,8 @@ function DatasetSkeleton() {
   );
 }
 
+type SortOption = 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, idToken, accessToken, loading } = useAuth();
@@ -21,6 +23,39 @@ export default function DashboardPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isLoadingDatasets, setIsLoadingDatasets] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+
+  // Filter and sort datasets
+  const filteredDatasets = useMemo(() => {
+    let result = [...datasets];
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((d) =>
+        d.name?.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort datasets
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'name-asc':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'name-desc':
+          return (b.name || '').localeCompare(a.name || '');
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [datasets, searchQuery, sortBy]);
 
   const loadDatasets = async () => {
     const token = idToken || accessToken;
@@ -91,6 +126,45 @@ export default function DashboardPage() {
           {error && <div style={{ color: 'var(--critical)', marginTop: 12 }} role="alert">{error}</div>}
         </div>
 
+        {/* Search and filter controls */}
+        {datasets.length > 0 && (
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ display: 'grid', gap: 6, flex: 1, minWidth: 200 }}>
+                <label htmlFor="search-datasets" className="field-label">Search datasets</label>
+                <input
+                  id="search-datasets"
+                  className="input"
+                  placeholder="Filter by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search datasets by name"
+                />
+              </div>
+              <div style={{ display: 'grid', gap: 6, minWidth: 150 }}>
+                <label htmlFor="sort-datasets" className="field-label">Sort by</label>
+                <select
+                  id="sort-datasets"
+                  className="input"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  aria-label="Sort datasets"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name-asc">Name A-Z</option>
+                  <option value="name-desc">Name Z-A</option>
+                </select>
+              </div>
+            </div>
+            {searchQuery && (
+              <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13 }}>
+                Showing {filteredDatasets.length} of {datasets.length} datasets
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid two">
           {isLoadingDatasets ? (
             <>
@@ -104,8 +178,14 @@ export default function DashboardPage() {
                 No datasets yet. Create your first dataset above to get started.
               </p>
             </div>
+          ) : filteredDatasets.length === 0 ? (
+            <div className="card" style={{ gridColumn: '1 / -1' }}>
+              <p style={{ color: 'var(--muted)', margin: 0 }}>
+                No datasets match your search. Try a different filter.
+              </p>
+            </div>
           ) : (
-            datasets.map((dataset) => (
+            filteredDatasets.map((dataset) => (
               <div className="card" key={dataset.datasetId}>
                 <h3 style={{ marginTop: 0 }}>{dataset.name}</h3>
                 <div style={{ color: 'var(--muted)', fontSize: 13 }}>

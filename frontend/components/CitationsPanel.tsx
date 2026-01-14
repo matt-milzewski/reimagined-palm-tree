@@ -35,6 +35,27 @@ export function CitationsPanel({ citations, hasSelection, onOpenSource }: Citati
                 <span className="citation-score">{citation.score.toFixed(2)}</span>
               )}
             </div>
+            {/* Construction metadata badges */}
+            <div className="citation-metadata">
+              {citation.doc_type && (
+                <span className={`badge doc-type-${citation.doc_type}`}>
+                  {citation.doc_type.toUpperCase()}
+                </span>
+              )}
+              {citation.discipline && (
+                <span className="badge discipline">{citation.discipline}</span>
+              )}
+              {citation.section_reference && (
+                <span className="badge section">§{citation.section_reference}</span>
+              )}
+            </div>
+            {citation.standards_referenced && citation.standards_referenced.length > 0 && (
+              <div className="citation-standards">
+                {citation.standards_referenced.slice(0, 3).map((std, idx) => (
+                  <span key={idx} className="badge standard">{std}</span>
+                ))}
+              </div>
+            )}
             <details>
               <summary>View excerpt</summary>
               <p className="citation-snippet">{citation.snippet || 'No excerpt available.'}</p>
