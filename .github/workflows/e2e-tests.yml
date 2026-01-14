@@ -1,0 +1,221 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_PAGER: ""
+  E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+  E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+
+jobs:
+  setup:
+    name: Setup Test Environment
+    runs-on: ubuntu-latest
+    outputs:
+      frontend-url: ${{ steps.outputs.outputs.frontend-url }}
+      api-url: ${{ steps.outputs.outputs.api-url }}
+      user-pool-id: ${{ steps.outputs.outputs.user-pool-id }}
+      user-pool-client-id: ${{ steps.outputs.outputs.user-pool-client-id }}
+      raw-bucket: ${{ steps.outputs.outputs.raw-bucket }}
+      processed-bucket: ${{ steps.outputs.outputs.processed-bucket }}
+      datasets-table: ${{ steps.outputs.outputs.datasets-table }}
+      files-table: ${{ steps.outputs.outputs.files-table }}
+      jobs-table: ${{ steps.outputs.outputs.jobs-table }}
+      audit-table: ${{ steps.outputs.outputs.audit-table }}
+      conversations-table: ${{ steps.outputs.outputs.conversations-table }}
+      messages-table: ${{ steps.outputs.outputs.messages-table }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get stack outputs
+        id: outputs
+        run: |
+          # API Stack
+          API_URL=$(aws cloudformation describe-stacks --stack-name RagReadinessApiStack --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+
+          # Auth Stack
+          USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name RagReadinessAuthStack --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
+          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name RagReadinessAuthStack --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text)
+
+          # Frontend Stack
+          FRONTEND_URL=$(aws cloudformation describe-stacks --stack-name RagReadinessFrontendStack --query "Stacks[0].Outputs[?OutputKey=='FrontendUrl'].OutputValue" --output text)
+
+          # Storage Stack
+          RAW_BUCKET=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?OutputKey=='RawBucketName'].OutputValue" --output text)
+          PROCESSED_BUCKET=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?OutputKey=='ProcessedBucketName'].OutputValue" --output text)
+          DATASETS_TABLE=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?contains(OutputKey, 'DatasetsTable')].OutputValue | [0]" --output text)
+          FILES_TABLE=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?contains(OutputKey, 'FilesTable')].OutputValue | [0]" --output text)
+          JOBS_TABLE=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?contains(OutputKey, 'JobsTable')].OutputValue | [0]" --output text)
+          AUDIT_TABLE=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?contains(OutputKey, 'AuditTable')].OutputValue | [0]" --output text)
+          CONVERSATIONS_TABLE=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?contains(OutputKey, 'ConversationsTable')].OutputValue | [0]" --output text)
+          MESSAGES_TABLE=$(aws cloudformation describe-stacks --stack-name RagReadinessStorageStack --query "Stacks[0].Outputs[?contains(OutputKey, 'MessagesTable')].OutputValue | [0]" --output text)
+
+          echo "api-url=${API_URL}" >> $GITHUB_OUTPUT
+          echo "user-pool-id=${USER_POOL_ID}" >> $GITHUB_OUTPUT
+          echo "user-pool-client-id=${USER_POOL_CLIENT_ID}" >> $GITHUB_OUTPUT
+          echo "frontend-url=${FRONTEND_URL}" >> $GITHUB_OUTPUT
+          echo "raw-bucket=${RAW_BUCKET}" >> $GITHUB_OUTPUT
+          echo "processed-bucket=${PROCESSED_BUCKET}" >> $GITHUB_OUTPUT
+          echo "datasets-table=${DATASETS_TABLE}" >> $GITHUB_OUTPUT
+          echo "files-table=${FILES_TABLE}" >> $GITHUB_OUTPUT
+          echo "jobs-table=${JOBS_TABLE}" >> $GITHUB_OUTPUT
+          echo "audit-table=${AUDIT_TABLE}" >> $GITHUB_OUTPUT
+          echo "conversations-table=${CONVERSATIONS_TABLE}" >> $GITHUB_OUTPUT
+          echo "messages-table=${MESSAGES_TABLE}" >> $GITHUB_OUTPUT
+
+  playwright-e2e:
+    name: Playwright E2E Tests
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Create test environment file
+        working-directory: tests/e2e
+        run: |
+          cat > .env.test <<EOF
+          FRONTEND_URL=${{ needs.setup.outputs.frontend-url }}
+          API_BASE_URL=${{ needs.setup.outputs.api-url }}
+          AWS_REGION=${{ env.AWS_REGION }}
+          USER_POOL_ID=${{ needs.setup.outputs.user-pool-id }}
+          USER_POOL_CLIENT_ID=${{ needs.setup.outputs.user-pool-client-id }}
+          E2E_TEST_EMAIL=${{ env.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD=${{ env.E2E_TEST_PASSWORD }}
+          TEST_RUN_ID=e2e-test-${{ github.run_id }}
+          RAW_BUCKET=${{ needs.setup.outputs.raw-bucket }}
+          PROCESSED_BUCKET=${{ needs.setup.outputs.processed-bucket }}
+          DATASETS_TABLE=${{ needs.setup.outputs.datasets-table }}
+          FILES_TABLE=${{ needs.setup.outputs.files-table }}
+          JOBS_TABLE=${{ needs.setup.outputs.jobs-table }}
+          AUDIT_TABLE=${{ needs.setup.outputs.audit-table }}
+          CONVERSATIONS_TABLE=${{ needs.setup.outputs.conversations-table }}
+          MESSAGES_TABLE=${{ needs.setup.outputs.messages-table }}
+          EOF
+
+      - name: Run Playwright tests
+        working-directory: tests/e2e
+        run: npm test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: tests/e2e/test-results/
+          retention-days: 7
+
+  cleanup:
+    name: Cleanup Test Resources
+    needs: [setup, playwright-e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          cd tests/shared
+          npm init -y
+          npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb @aws-sdk/client-s3 @aws-sdk/client-cognito-identity-provider typescript @types/node
+
+      - name: Run cleanup script
+        run: |
+          cat > tests/shared/run-cleanup.ts <<'EOF'
+          import { E2ECleanupManager } from './cleanup-manager';
+
+          async function main() {
+            const manager = new E2ECleanupManager({
+              region: process.env.AWS_REGION!,
+              datasetsTable: process.env.DATASETS_TABLE!,
+              filesTable: process.env.FILES_TABLE!,
+              jobsTable: process.env.JOBS_TABLE!,
+              auditTable: process.env.AUDIT_TABLE!,
+              conversationsTable: process.env.CONVERSATIONS_TABLE!,
+              messagesTable: process.env.MESSAGES_TABLE!,
+              rawBucket: process.env.RAW_BUCKET!,
+              processedBucket: process.env.PROCESSED_BUCKET!,
+              userPoolId: process.env.USER_POOL_ID!
+            });
+
+            await manager.cleanupOrphanedResources('e2e-test-', 2);
+            console.log('Cleanup completed');
+          }
+
+          main().catch(console.error);
+          EOF
+
+          export AWS_REGION=${{ env.AWS_REGION }}
+          export DATASETS_TABLE=${{ needs.setup.outputs.datasets-table }}
+          export FILES_TABLE=${{ needs.setup.outputs.files-table }}
+          export JOBS_TABLE=${{ needs.setup.outputs.jobs-table }}
+          export AUDIT_TABLE=${{ needs.setup.outputs.audit-table }}
+          export CONVERSATIONS_TABLE=${{ needs.setup.outputs.conversations-table }}
+          export MESSAGES_TABLE=${{ needs.setup.outputs.messages-table }}
+          export RAW_BUCKET=${{ needs.setup.outputs.raw-bucket }}
+          export PROCESSED_BUCKET=${{ needs.setup.outputs.processed-bucket }}
+          export USER_POOL_ID=${{ needs.setup.outputs.user-pool-id }}
+
+          cd tests/shared
+          npx ts-node run-cleanup.ts
