@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiRequest } from './api';
+import { apiRequest, ApiError } from './api';
 
 export type Citation = {
   chunk_id: string;
@@ -117,14 +117,41 @@ export function useChat({ datasetId, accessToken, topK }: UseChatParams) {
           isSending: false
         }));
       } catch (error) {
+        let errorContent = 'Something went wrong. Please retry.';
+        let errorMessage = 'Failed to send message.';
+
+        if (error instanceof ApiError) {
+          if (error.status === 409) {
+            errorContent = error.message || 'Dataset is not ready for chat.';
+            errorMessage = errorContent;
+          } else if (error.status === 404) {
+            errorContent = error.message || 'Resource not found.';
+            errorMessage = errorContent;
+          } else if (error.status === 401 || error.status === 403) {
+            errorContent = 'Session expired. Please refresh and try again.';
+            errorMessage = 'Authentication error.';
+          } else if (error.status >= 500) {
+            errorContent = 'Server error. Please try again in a moment.';
+            errorMessage = error.message || 'Server error occurred.';
+          } else {
+            errorContent = error.message || errorContent;
+            errorMessage = error.message || errorMessage;
+          }
+        } else if (error instanceof Error) {
+          if (error.message.includes('fetch') || error.message.includes('network')) {
+            errorContent = 'Network error. Check your connection and retry.';
+            errorMessage = 'Network error.';
+          }
+        }
+
         updateMessage(assistantMessageId, {
           status: 'error',
-          content: 'Something went wrong. Please retry.'
+          content: errorContent
         });
         setState((prev) => ({
           ...prev,
           isSending: false,
-          error: 'Failed to send message.'
+          error: errorMessage
         }));
       }
     },

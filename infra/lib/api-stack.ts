@@ -36,7 +36,7 @@ export class ApiStack extends cdk.Stack {
     const chatModelId =
       this.node.tryGetContext('bedrockChatModelId') ||
       process.env.BEDROCK_CHAT_MODEL_ID ||
-      'anthropic.claude-3-haiku-20240307-v1:0';
+      'anthropic.claude-3-5-haiku-20241022-v1:0';
     const embeddingDimension =
       this.node.tryGetContext('embeddingDimension') ||
       process.env.EMBEDDING_DIMENSION ||
@@ -50,7 +50,7 @@ export class ApiStack extends cdk.Stack {
       entry: path.join(__dirname, '../../backend/api/src/handler.ts'),
       runtime: lambda.Runtime.NODEJS_18_X,
       memorySize: 512,
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(60),
       environment: {
         DATASETS_TABLE: props.storage.datasetsTable.tableName,
         FILES_TABLE: props.storage.filesTable.tableName,

@@ -223,7 +223,46 @@ function buildChatPrompt(question: string, sourcesText: string): string {
   return `Question:\n${question}\n\nSources:\n${sourcesText}\n\nAnswer:`;
 }
 
-async function invokeChatModel(prompt: string): Promise<string> {
+type ConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+async function fetchConversationHistory(
+  tenantId: string,
+  conversationId: string,
+  limit: number = 10
+): Promise<ConversationMessage[]> {
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: MESSAGES_TABLE,
+      KeyConditionExpression: 'tenantConversationId = :tcid',
+      ExpressionAttributeValues: {
+        ':tcid': `${tenantId}#${conversationId}`
+      },
+      ScanIndexForward: true,
+      Limit: limit * 2
+    })
+  );
+
+  const messages: ConversationMessage[] = [];
+  for (const item of result.Items || []) {
+    if (item.role === 'user' || item.role === 'assistant') {
+      messages.push({
+        role: item.role as 'user' | 'assistant',
+        content: item.content || ''
+      });
+    }
+  }
+
+  const recentMessages = messages.slice(-limit * 2);
+  return recentMessages;
+}
+
+async function invokeChatModel(
+  prompt: string,
+  conversationHistory: ConversationMessage[] = []
+): Promise<string> {
   if (!BEDROCK_CHAT_MODEL_ID) {
     throw new Error('Missing Bedrock chat model configuration.');
   }
@@ -232,17 +271,31 @@ async function invokeChatModel(prompt: string): Promise<string> {
   const modelId = BEDROCK_CHAT_MODEL_ID;
 
   if (modelId.startsWith('anthropic.')) {
+    const messages: Array<{ role: string; content: string }> = [];
+
+    for (const msg of conversationHistory) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+
+    messages.push({ role: 'user', content: prompt });
+
     body = JSON.stringify({
       anthropic_version: 'bedrock-2023-05-31',
-      max_tokens: 800,
+      max_tokens: 1024,
       temperature: 0.2,
       system: chatSystemPrompt,
-      messages: [{ role: 'user', content: prompt }]
+      messages
     });
   } else if (modelId.startsWith('amazon.titan-text')) {
+    const historyText = conversationHistory
+      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+      .join('\n\n');
+    const fullPrompt = historyText
+      ? `${chatSystemPrompt}\n\nConversation history:\n${historyText}\n\nUser: ${prompt}`
+      : `${chatSystemPrompt}\n\n${prompt}`;
     body = JSON.stringify({
-      inputText: `${chatSystemPrompt}\n\n${prompt}`,
-      textGenerationConfig: { maxTokenCount: 800, temperature: 0.2, topP: 0.9 }
+      inputText: fullPrompt,
+      textGenerationConfig: { maxTokenCount: 1024, temperature: 0.2, topP: 0.9 }
     });
   } else {
     body = JSON.stringify({ inputText: `${chatSystemPrompt}\n\n${prompt}` });
@@ -790,10 +843,17 @@ async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyR
 
   const { citations, sourcesText } = buildCitations(hits);
 
+  // Fetch conversation history for multi-turn context
+  const conversationHistory = await fetchConversationHistory(tenantId, conversationId, 10);
+
   let answer = 'I do not know based on the available sources.';
   if (citations.length > 0) {
     const prompt = buildChatPrompt(message, sourcesText);
-    answer = await invokeChatModel(prompt);
+    answer = await invokeChatModel(prompt, conversationHistory);
+  } else if (conversationHistory.length > 0) {
+    // Even without new citations, allow follow-up questions using conversation context
+    const prompt = `Based on our previous conversation, the user asks: ${message}\n\nNote: No new relevant sources were found for this specific question. Please respond based on the conversation context if possible, or indicate if you need more specific information.`;
+    answer = await invokeChatModel(prompt, conversationHistory);
   }
 
   const assistantMessageId = newId();
