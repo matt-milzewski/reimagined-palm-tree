@@ -2,5 +2,37 @@
   "hosted-zone:account=622842579488:domainName=getragready.com:region=ap-southeast-2": {
     "Id": "/hostedzone/Z01181782PX6X86EXKTFT",
     "Name": "getragready.com."
+  },
+  "vpc-provider:account=622842579488:filter.isDefault=true:region=ap-southeast-2:returnAsymmetricSubnets=true": {
+    "vpcId": "vpc-6025d806",
+    "vpcCidrBlock": "172.31.0.0/16",
+    "ownerAccountId": "622842579488",
+    "availabilityZones": [],
+    "subnetGroups": [
+      {
+        "name": "Public",
+        "type": "Public",
+        "subnets": [
+          {
+            "subnetId": "subnet-d962c7bf",
+            "cidr": "172.31.0.0/20",
+            "availabilityZone": "ap-southeast-2a",
+            "routeTableId": "rtb-2eaaed48"
+          },
+          {
+            "subnetId": "subnet-fab066b2",
+            "cidr": "172.31.32.0/20",
+            "availabilityZone": "ap-southeast-2b",
+            "routeTableId": "rtb-2eaaed48"
+          },
+          {
+            "subnetId": "subnet-2ed48076",
+            "cidr": "172.31.16.0/20",
+            "availabilityZone": "ap-southeast-2c",
+            "routeTableId": "rtb-2eaaed48"
+          }
+        ]
+      }
+    ]
   }
 }

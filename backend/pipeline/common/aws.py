@@ -18,6 +18,11 @@ def get_env() -> dict:
         "EMBEDDING_DIMENSION": os.environ.get("EMBEDDING_DIMENSION", ""),
         "INGEST_BATCH_SIZE": os.environ.get("INGEST_BATCH_SIZE", "50"),
         "INGEST_CONCURRENCY": os.environ.get("INGEST_CONCURRENCY", "4"),
+        # PostgreSQL configuration
+        "DB_HOST": os.environ.get("DB_HOST", ""),
+        "DB_PORT": os.environ.get("DB_PORT", "5432"),
+        "DB_NAME": os.environ.get("DB_NAME", "ragready"),
+        "DB_SECRET_ARN": os.environ.get("DB_SECRET_ARN", ""),
     }
 
 

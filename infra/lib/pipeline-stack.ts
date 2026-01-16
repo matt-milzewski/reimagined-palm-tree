@@ -8,11 +8,11 @@ import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import { StorageStack } from './storage-stack';
-import { VectorStack } from './vector-stack';
+import { PostgresVectorStack } from './postgres-vector-stack';
 
 interface PipelineStackProps extends cdk.StackProps {
   storage: StorageStack;
-  vector: VectorStack;
+  postgresVector: PostgresVectorStack;
 }
 
 export class PipelineStack extends cdk.Stack {
@@ -48,8 +48,11 @@ export class PipelineStack extends cdk.Stack {
       AUDIT_TABLE: props.storage.auditTable.tableName,
       FILES_GSI_HASH: 'rawSha256-index',
       FILES_GSI_RECENT: 'tenantCreatedAt-index',
-      OPENSEARCH_COLLECTION_ENDPOINT: props.vector.collectionEndpoint,
-      OPENSEARCH_INDEX_NAME: props.vector.indexName,
+      // PostgreSQL configuration (replaces OpenSearch)
+      DB_HOST: props.postgresVector.dbEndpoint,
+      DB_PORT: props.postgresVector.dbPort.toString(),
+      DB_NAME: props.postgresVector.databaseName,
+      DB_SECRET_ARN: props.postgresVector.dbSecret.secretArn,
       BEDROCK_EMBED_MODEL_ID: embedModelId,
       EMBEDDING_DIMENSION: embeddingDimension,
       INGEST_BATCH_SIZE: ingestBatchSize,
@@ -117,16 +120,13 @@ export class PipelineStack extends cdk.Stack {
     );
     vectorIngestFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['aoss:APIAccessAll'],
-        resources: [props.vector.collectionArn]
-      })
-    );
-    vectorIngestFn.addToRolePolicy(
-      new iam.PolicyStatement({
         actions: ['cloudwatch:PutMetricData'],
         resources: ['*']
       })
     );
+
+    // Grant access to PostgreSQL credentials in Secrets Manager
+    props.postgresVector.dbSecret.grantRead(vectorIngestFn);
 
     const markRunningTask = new tasks.LambdaInvoke(this, 'MarkRunning', {
       lambdaFunction: markRunningFn,

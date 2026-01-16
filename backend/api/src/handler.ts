@@ -8,7 +8,7 @@ import { ddb } from '../../shared/ddb';
 import { getTenantContext } from '../../shared/auth';
 import { log } from '../../shared/logger';
 import { newId } from '../../shared/ids';
-import { buildKnnQuery, openSearchRequest } from './opensearch';
+import { vectorSearch } from './postgres';
 import { validateDatasetForChat } from './chat-utils';
 
 const s3 = new S3Client({});
@@ -23,7 +23,6 @@ const RAW_BUCKET = process.env.RAW_BUCKET || '';
 const PROCESSED_BUCKET = process.env.PROCESSED_BUCKET || '';
 const CONTACT_RECIPIENT_EMAIL = process.env.CONTACT_RECIPIENT_EMAIL || '';
 const CONTACT_FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || '';
-const OPENSEARCH_INDEX_NAME = process.env.OPENSEARCH_INDEX_NAME || '';
 const BEDROCK_EMBED_MODEL_ID = process.env.BEDROCK_EMBED_MODEL_ID || '';
 const BEDROCK_CHAT_MODEL_ID = process.env.BEDROCK_CHAT_MODEL_ID || '';
 const EMBEDDING_DIMENSION = Number.parseInt(process.env.EMBEDDING_DIMENSION || '0', 10);
@@ -653,34 +652,25 @@ async function handleRagQuery(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   if (!query || typeof query !== 'string') {
     return jsonResponse(400, { message: 'query is required.' });
   }
-  if (!OPENSEARCH_INDEX_NAME) {
-    return jsonResponse(500, { message: 'Vector index not configured.' });
-  }
 
   const vector = await embedQuery(query);
-  const searchPayload = buildKnnQuery({
+
+  // Use PostgreSQL pgvector for similarity search
+  const hits = await vectorSearch({
     tenantId,
     datasetId,
     vector,
     topK
   });
 
-  const response = await openSearchRequest('POST', `/${OPENSEARCH_INDEX_NAME}/_search`, searchPayload);
-  if (response.status >= 300) {
-    log('ERROR', 'OpenSearch query failed', { status: response.status, body: response.body });
-    return jsonResponse(500, { message: 'Vector query failed.' });
-  }
-
-  const payload = response.body ? JSON.parse(response.body) : {};
-  const hits = payload.hits?.hits || [];
-  const results = hits.map((hit: any) => ({
-    text: hit._source?.text || '',
-    score: hit._score || 0,
+  const results = hits.map((hit) => ({
+    text: hit.text || '',
+    score: hit.score || 0,
     citation: {
-      filename: hit._source?.filename,
-      page: hit._source?.page ?? null,
-      chunk_id: hit._source?.chunk_id,
-      doc_id: hit._source?.doc_id
+      filename: hit.filename,
+      page: hit.page ?? null,
+      chunk_id: hit.chunk_id,
+      doc_id: hit.doc_id
     }
   }));
 
@@ -704,9 +694,6 @@ async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyR
   }
   if (!CONVERSATIONS_TABLE || !MESSAGES_TABLE) {
     return jsonResponse(500, { message: 'Chat storage not configured.' });
-  }
-  if (!OPENSEARCH_INDEX_NAME) {
-    return jsonResponse(500, { message: 'Vector index not configured.' });
   }
 
   const datasetResult = await ddb.send(
@@ -775,21 +762,32 @@ async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyR
   // Expand query with construction terminology for better retrieval
   const expandedQuery = expandConstructionQuery(message);
   const vector = await embedQuery(expandedQuery);
-  const searchPayload = buildKnnQuery({
+
+  // Use PostgreSQL pgvector for similarity search
+  const pgHits = await vectorSearch({
     tenantId,
     datasetId,
     vector,
     topK
   });
 
-  const response = await openSearchRequest('POST', `/${OPENSEARCH_INDEX_NAME}/_search`, searchPayload);
-  if (response.status >= 300) {
-    log('ERROR', 'OpenSearch retrieval failed', { status: response.status });
-    return jsonResponse(500, { message: 'Retrieval failed.' });
-  }
+  // Transform PostgreSQL results to match expected format for buildCitations
+  const hits = pgHits.map((hit) => ({
+    _id: hit.chunk_id,
+    _score: hit.score,
+    _source: {
+      chunk_id: hit.chunk_id,
+      doc_id: hit.doc_id,
+      filename: hit.filename,
+      page: hit.page,
+      text: hit.text,
+      doc_type: hit.doc_type,
+      discipline: hit.discipline,
+      section_reference: hit.section_reference,
+      standards_referenced: hit.standards_referenced
+    }
+  }));
 
-  const payload = response.body ? JSON.parse(response.body) : {};
-  const hits = payload.hits?.hits || [];
   const { citations, sourcesText } = buildCitations(hits);
 
   let answer = 'I do not know based on the available sources.';

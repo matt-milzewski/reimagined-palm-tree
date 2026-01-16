@@ -7,12 +7,12 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 import { StorageStack } from './storage-stack';
 import { AuthStack } from './auth-stack';
-import { VectorStack } from './vector-stack';
+import { PostgresVectorStack } from './postgres-vector-stack';
 
 interface ApiStackProps extends cdk.StackProps {
   storage: StorageStack;
   auth: AuthStack;
-  vector: VectorStack;
+  postgresVector: PostgresVectorStack;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -62,8 +62,11 @@ export class ApiStack extends cdk.Stack {
         PROCESSED_BUCKET: props.storage.processedBucket.bucketName,
         CONTACT_RECIPIENT_EMAIL: contactRecipientEmail,
         CONTACT_FROM_EMAIL: contactFromEmail,
-        OPENSEARCH_COLLECTION_ENDPOINT: props.vector.collectionEndpoint,
-        OPENSEARCH_INDEX_NAME: props.vector.indexName,
+        // PostgreSQL configuration (replaces OpenSearch)
+        DB_HOST: props.postgresVector.dbEndpoint,
+        DB_PORT: props.postgresVector.dbPort.toString(),
+        DB_NAME: props.postgresVector.databaseName,
+        DB_SECRET_ARN: props.postgresVector.dbSecret.secretArn,
         BEDROCK_EMBED_MODEL_ID: embedModelId,
         BEDROCK_CHAT_MODEL_ID: chatModelId,
         EMBEDDING_DIMENSION: embeddingDimension,
@@ -101,12 +104,9 @@ export class ApiStack extends cdk.Stack {
         resources: [`arn:aws:bedrock:${this.region}::foundation-model/${chatModelId}`]
       })
     );
-    apiFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['aoss:APIAccessAll'],
-        resources: [props.vector.collectionArn]
-      })
-    );
+
+    // Grant access to PostgreSQL credentials in Secrets Manager
+    props.postgresVector.dbSecret.grantRead(apiFn);
 
     const api = new apigateway.RestApi(this, 'RagReadinessApi', {
       restApiName: 'RagReady API',

@@ -6,8 +6,7 @@ import { StorageStack } from '../lib/storage-stack';
 import { PipelineStack } from '../lib/pipeline-stack';
 import { ApiStack } from '../lib/api-stack';
 import { FrontendStack } from '../lib/frontend-stack';
-import { VectorStack } from '../lib/vector-stack';
-import { VectorAccessStack } from '../lib/vector-access-stack';
+import { PostgresVectorStack } from '../lib/postgres-vector-stack';
 
 const app = new cdk.App();
 const env = {
@@ -17,35 +16,25 @@ const env = {
 
 const authStack = new AuthStack(app, 'RagReadinessAuthStack', { env });
 const storageStack = new StorageStack(app, 'RagReadinessStorageStack', { env });
-const vectorStack = new VectorStack(app, 'RagReadyVectorStack', { env });
+const postgresVectorStack = new PostgresVectorStack(app, 'RagReadyPostgresVectorStack', { env });
 const pipelineStack = new PipelineStack(app, 'RagReadinessPipelineStack', {
   env,
   storage: storageStack,
-  vector: vectorStack
+  postgresVector: postgresVectorStack
 });
 const apiStack = new ApiStack(app, 'RagReadinessApiStack', {
   env,
   auth: authStack,
   storage: storageStack,
-  vector: vectorStack
+  postgresVector: postgresVectorStack
 });
 new FrontendStack(app, 'RagReadinessFrontendStack', { env });
-const vectorAccessStack = new VectorAccessStack(app, 'RagReadyVectorAccessStack', {
-  env,
-  collectionName: vectorStack.collectionName,
-  ingestionRoleArn: pipelineStack.ingestionRoleArn,
-  queryRoleArn: apiStack.apiRoleArn
-});
 
 apiStack.addDependency(authStack);
 apiStack.addDependency(storageStack);
 
 pipelineStack.addDependency(storageStack);
 pipelineStack.addDependency(authStack);
-pipelineStack.addDependency(vectorStack);
+pipelineStack.addDependency(postgresVectorStack);
 
-apiStack.addDependency(vectorStack);
-
-vectorAccessStack.addDependency(vectorStack);
-vectorAccessStack.addDependency(pipelineStack);
-vectorAccessStack.addDependency(apiStack);
+apiStack.addDependency(postgresVectorStack);

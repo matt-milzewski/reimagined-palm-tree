@@ -1,2 +1,5 @@
 pypdf==4.2.0
 pdfminer.six==20231228
+psycopg2-binary==2.9.9
+numpy==1.26.4
+pgvector==0.2.4
