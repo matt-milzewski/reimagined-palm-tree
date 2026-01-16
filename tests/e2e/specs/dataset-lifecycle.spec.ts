@@ -18,8 +18,8 @@ test.describe('Dataset Lifecycle', () => {
 
     // Already on dashboard from authenticatedPage fixture
     // Look for create dataset input
-    await page.fill('input[placeholder="Dataset name"]', datasetName);
-    await page.click('button:has-text("Create")');
+    await page.fill('input[placeholder="Enter dataset name"]', datasetName);
+    await page.click('button:has-text("Create dataset")');
 
     // Wait for dataset to appear in list
     await page.waitForSelector(`text=${datasetName}`, { timeout: 10000 });

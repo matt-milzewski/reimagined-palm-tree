@@ -39,8 +39,9 @@ test.describe('Authentication', () => {
     // Start at landing page
     await page.goto('/');
 
-    // Click login button
-    await page.click('a[href="/login"]');
+    // Click the "Log in" link in the hero section (more reliable than nav)
+    // Use getByRole for accessibility-friendly selection
+    await page.getByRole('link', { name: 'Log in' }).first().click();
 
     // Verify we're on login page
     await expect(page).toHaveURL(/\/login/);

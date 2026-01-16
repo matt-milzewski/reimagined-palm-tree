@@ -1,70 +1,96 @@
 /**
  * Generate a minimal PDF for testing
- * This creates a simple PDF with text content
+ * This creates a PDF with properly encoded text that can be extracted by pypdf/pdfminer
  */
 export function generateMinimalPDF(content: string = 'Test Document Content'): Buffer {
-  // Minimal PDF structure
-  // This is a basic PDF that contains a single page with text
-  const pdfContent = `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/Resources <<
-/Font <<
-/F1 <<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>
->>
->>
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
->>
-endobj
-4 0 obj
-<<
-/Length ${50 + content.length}
->>
-stream
-BT
+  // Escape special PDF characters in content
+  const escapedContent = content
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
+
+  // Build content stream - using proper text object with positioning
+  const contentStream = `BT
 /F1 12 Tf
-50 750 Td
-(${content}) Tj
-ET
+1 0 0 1 72 720 Tm
+(${escapedContent}) Tj
+ET`;
+
+  const streamLength = contentStream.length;
+
+  // Build PDF with proper structure for text extraction
+  // Using explicit font encoding and proper xref table
+  const obj1 = `1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+`;
+
+  const obj2 = `2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+`;
+
+  const obj3 = `3 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /MediaBox [0 0 612 792]
+  /Contents 4 0 R
+  /Resources <<
+    /Font << /F1 5 0 R >>
+  >>
+>>
+endobj
+`;
+
+  const obj4 = `4 0 obj
+<< /Length ${streamLength} >>
+stream
+${contentStream}
 endstream
 endobj
-xref
-0 5
-0000000000 65535 f
-0000000009 00000 n
-0000000058 00000 n
-0000000115 00000 n
-0000000317 00000 n
-trailer
+`;
+
+  const obj5 = `5 0 obj
 <<
-/Size 5
-/Root 1 0 R
+  /Type /Font
+  /Subtype /Type1
+  /BaseFont /Helvetica
+  /Encoding /WinAnsiEncoding
 >>
+endobj
+`;
+
+  const header = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
+  const body = obj1 + obj2 + obj3 + obj4 + obj5;
+
+  // Calculate byte offsets for xref table
+  const headerLen = Buffer.from(header).length;
+  const obj1Start = headerLen;
+  const obj2Start = obj1Start + Buffer.from(obj1).length;
+  const obj3Start = obj2Start + Buffer.from(obj2).length;
+  const obj4Start = obj3Start + Buffer.from(obj3).length;
+  const obj5Start = obj4Start + Buffer.from(obj4).length;
+  const xrefStart = obj5Start + Buffer.from(obj5).length;
+
+  const xref = `xref
+0 6
+0000000000 65535 f
+${obj1Start.toString().padStart(10, '0')} 00000 n
+${obj2Start.toString().padStart(10, '0')} 00000 n
+${obj3Start.toString().padStart(10, '0')} 00000 n
+${obj4Start.toString().padStart(10, '0')} 00000 n
+${obj5Start.toString().padStart(10, '0')} 00000 n
+`;
+
+  const trailer = `trailer
+<< /Size 6 /Root 1 0 R >>
 startxref
-${415 + content.length}
+${xrefStart}
 %%EOF`;
 
-  return Buffer.from(pdfContent, 'utf-8');
+  const pdfContent = header + body + xref + trailer;
+  return Buffer.from(pdfContent, 'binary');
 }
 
 /**
