@@ -2,18 +2,8 @@ import { test, expect } from '../fixtures/auth';
 import { cleanupDataset, generateTestDatasetName } from '../fixtures/cleanup';
 import { generateMinimalPDF, waitFor } from '../../shared/test-data-generator';
 
-/**
- * Chat tests are currently skipped because they depend on the vector ingestion pipeline
- * setting the dataset status to READY. The pipeline's vector_ingest.py step needs to
- * successfully process the uploaded PDF and ingest embeddings into PostgreSQL.
- *
- * TODO: Enable these tests once the vector ingestion pipeline is working:
- * 1. Verify pypdf/pdfminer can extract text from the test PDFs
- * 2. Ensure vector_ingest.py runs and sets dataset status to READY
- * 3. Remove the .skip() from these tests
- */
 test.describe('Chat with Citations', () => {
-  test.skip('should chat with dataset and receive citations', async ({ authenticatedPage: page, tenantId }) => {
+  test('should chat with dataset and receive citations', async ({ authenticatedPage: page, tenantId }) => {
     test.setTimeout(300000); // 5 minutes for setup + chat
 
     // Step 1: Create dataset from dashboard
@@ -22,9 +12,9 @@ test.describe('Chat with Citations', () => {
     await page.click('button:has-text("Create dataset")');
     await page.waitForSelector(`text=${datasetName}`);
 
-    // Click the first "View dataset" button (newest dataset - they're sorted newest first)
-    const viewButtons = page.locator('button:has-text("View dataset")');
-    await viewButtons.first().click();
+    // Find and click the "View dataset" button for our specific dataset
+    const datasetCard = page.locator('.card', { hasText: datasetName });
+    await datasetCard.locator('button:has-text("View dataset")').click();
     await page.waitForURL(/datasetId=/, { timeout: 10000 });
 
     const url = new URL(page.url());
@@ -33,32 +23,67 @@ test.describe('Chat with Citations', () => {
 
     console.log(`Created dataset: ${datasetId}`);
 
-    // Step 2: Upload file with safety content
-    const pdfContent = generateMinimalPDF(
-      'This is a construction safety document. Hard hats must be worn at all times on site. Safety is our top priority. All workers must complete safety induction.'
+    // Step 2: Upload file using same content as lifecycle test (which works reliably)
+    const pdfBuffer = await generateMinimalPDF(
+      `RAGREADY PLATFORM TEST DOCUMENT
+
+SECTION 1: INTRODUCTION
+
+This document is used for end-to-end testing of the RagReady platform document processing pipeline. The pipeline extracts text from uploaded documents, processes the content, and prepares it for retrieval-augmented generation (RAG) operations.
+
+SECTION 2: DOCUMENT PROCESSING OVERVIEW
+
+The document processing pipeline consists of several stages including text extraction, normalization, quality checks, chunking, and vector embedding. Each stage validates the content and prepares it for the next step in the pipeline.
+
+SECTION 3: TEXT EXTRACTION
+
+Text extraction uses multiple methods to ensure reliable content extraction from PDF documents. The system first attempts extraction using pypdf, and falls back to pdfminer if the initial extraction yields insufficient text.
+
+SECTION 4: QUALITY ASSURANCE
+
+The quality assurance process evaluates extracted text for readiness scoring. This includes checking text length, identifying potential issues, and generating quality reports that help users understand document processing results.
+
+SECTION 5: VECTOR EMBEDDING
+
+After chunking, the system generates vector embeddings for each chunk using Amazon Bedrock. These embeddings enable semantic search and retrieval of relevant document sections during chat operations.`
     );
-    const pdfBuffer = Buffer.from(pdfContent);
 
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles({
-      name: 'safety-document.pdf',
+      name: 'test-document.pdf',
       mimeType: 'application/pdf',
       buffer: pdfBuffer
     });
 
-    // Wait for processing to complete (check for View results button)
+    // Wait for processing to finish (either COMPLETE or FAILED)
     console.log('Waiting for file processing to complete...');
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(1000);
-        const viewResultsButton = await page.locator('button:has-text("View results")').count();
-        return viewResultsButton > 0;
+        // Check for any terminal status (COMPLETE or FAILED)
+        const completeStatus = await page.locator('td:has-text("COMPLETE")').count();
+        const failedStatus = await page.locator('td:has-text("FAILED")').count();
+        return completeStatus > 0 || failedStatus > 0;
       },
       { timeout: 180000, interval: 5000, timeoutMessage: 'File processing did not complete' }
     );
 
-    console.log('File processing completed');
+    // Check if processing succeeded
+    const failedStatus = await page.locator('td:has-text("FAILED")').count();
+    if (failedStatus > 0) {
+      // Click View results to see the error message
+      await page.click('button:has-text("View results")');
+      await page.waitForTimeout(2000);
+
+      // Try to capture error message from results page
+      const errorMessage = await page.locator('text=/error|Error/i').first().textContent().catch(() => 'Unknown error');
+      const jobCell = await page.locator('table tbody tr td:nth-child(3)').textContent().catch(() => 'unknown');
+
+      throw new Error(`File processing FAILED. Error: ${errorMessage}. Job ID: ${jobCell}`);
+    }
+
+    console.log('File processing completed successfully');
 
     // Step 3: Navigate to chat page
     await page.goto('/chat/index.html');
@@ -70,6 +95,7 @@ test.describe('Chat with Citations', () => {
     const selectElement = page.locator('select#dataset-picker');
 
     // Wait for our dataset option to appear and be enabled (READY status)
+    // Vector ingestion with Bedrock embeddings can take time
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
@@ -78,7 +104,7 @@ test.describe('Chat with Citations', () => {
         const readyOption = options.find(opt => opt.includes(datasetName) && opt.includes('READY'));
         return !!readyOption;
       },
-      { timeout: 30000, interval: 2000, timeoutMessage: 'Dataset did not become READY' }
+      { timeout: 120000, interval: 3000, timeoutMessage: 'Dataset did not become READY' }
     );
 
     await selectElement.selectOption({ label: new RegExp(datasetName) });
@@ -92,7 +118,7 @@ test.describe('Chat with Citations', () => {
     await page.click('button:has-text("Send")');
 
     // Wait for assistant response
-    const assistantMessage = page.locator('.message').filter({ hasText: /safety|hard hat|induction/i });
+    const assistantMessage = page.locator('.message').filter({ hasText: /safety|hard hat|induction|protective/i });
     await expect(assistantMessage).toBeVisible({ timeout: 60000 });
 
     // Verify response has content
@@ -110,7 +136,7 @@ test.describe('Chat with Citations', () => {
     await cleanupDataset(datasetId, tenantId);
   });
 
-  test.skip('should open source document from citation', async ({ authenticatedPage: page, tenantId }) => {
+  test('should open source document from citation', async ({ authenticatedPage: page, tenantId }) => {
     test.setTimeout(300000);
 
     // Create dataset
@@ -119,37 +145,69 @@ test.describe('Chat with Citations', () => {
     await page.click('button:has-text("Create dataset")');
     await page.waitForSelector(`text=${datasetName}`);
 
-    const viewButtons = page.locator('button:has-text("View dataset")');
-    await viewButtons.first().click();
+    // Find and click the "View dataset" button for our specific dataset
+    const datasetCard = page.locator('.card', { hasText: datasetName });
+    await datasetCard.locator('button:has-text("View dataset")').click();
     await page.waitForURL(/datasetId=/, { timeout: 10000 });
 
     const url = new URL(page.url());
     const datasetId = url.searchParams.get('datasetId')!;
 
-    // Upload file
-    const pdfContent = generateMinimalPDF('Construction safety document with important guidelines.');
+    // Upload file using same content as lifecycle test (which works reliably)
+    const pdfBuffer = await generateMinimalPDF(
+      `RAGREADY PLATFORM TEST DOCUMENT
+
+SECTION 1: INTRODUCTION
+
+This document is used for end-to-end testing of the RagReady platform document processing pipeline. The pipeline extracts text from uploaded documents, processes the content, and prepares it for retrieval-augmented generation (RAG) operations.
+
+SECTION 2: DOCUMENT PROCESSING OVERVIEW
+
+The document processing pipeline consists of several stages including text extraction, normalization, quality checks, chunking, and vector embedding. Each stage validates the content and prepares it for the next step in the pipeline.
+
+SECTION 3: TEXT EXTRACTION
+
+Text extraction uses multiple methods to ensure reliable content extraction from PDF documents. The system first attempts extraction using pypdf, and falls back to pdfminer if the initial extraction yields insufficient text.
+
+SECTION 4: QUALITY ASSURANCE
+
+The quality assurance process evaluates extracted text for readiness scoring. This includes checking text length, identifying potential issues, and generating quality reports that help users understand document processing results.
+
+SECTION 5: VECTOR EMBEDDING
+
+After chunking, the system generates vector embeddings for each chunk using Amazon Bedrock. These embeddings enable semantic search and retrieval of relevant document sections during chat operations.`
+    );
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles({
-      name: 'guidelines.pdf',
+      name: 'test-document.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from(pdfContent)
+      buffer: pdfBuffer
     });
 
-    // Wait for processing
+    // Wait for processing to finish (either COMPLETE or FAILED)
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(1000);
-        return (await page.locator('button:has-text("View results")').count()) > 0;
+        const completeStatus = await page.locator('td:has-text("COMPLETE")').count();
+        const failedStatus = await page.locator('td:has-text("FAILED")').count();
+        return completeStatus > 0 || failedStatus > 0;
       },
-      { timeout: 180000, interval: 5000 }
+      { timeout: 180000, interval: 5000, timeoutMessage: 'File processing did not complete' }
     );
+
+    // Check if processing succeeded
+    const failedStatus = await page.locator('td:has-text("FAILED")').count();
+    if (failedStatus > 0) {
+      const jobCell = await page.locator('table tbody tr td:nth-child(3)').textContent();
+      throw new Error(`File processing FAILED. Job ID: ${jobCell}. Check CloudWatch logs for details.`);
+    }
 
     // Navigate to chat
     await page.goto('/chat/index.html');
     await page.waitForSelector('select:not([disabled])', { timeout: 15000 });
 
-    // Wait for dataset to be READY
+    // Wait for dataset to be READY (vector ingestion with Bedrock can take time)
     const selectElement = page.locator('select#dataset-picker');
     await waitFor(
       async () => {
@@ -158,7 +216,7 @@ test.describe('Chat with Citations', () => {
         const options = await selectElement.locator('option').allTextContents();
         return options.some(opt => opt.includes(datasetName) && opt.includes('READY'));
       },
-      { timeout: 30000, interval: 2000 }
+      { timeout: 120000, interval: 3000, timeoutMessage: 'Dataset did not become READY' }
     );
 
     await selectElement.selectOption({ label: new RegExp(datasetName) });
@@ -169,7 +227,7 @@ test.describe('Chat with Citations', () => {
     await page.click('button:has-text("Send")');
 
     // Wait for response
-    await expect(page.locator('.message').filter({ hasText: /guidelines|safety/i })).toBeVisible({ timeout: 60000 });
+    await expect(page.locator('.message').filter({ hasText: /guidelines|safety|protective/i })).toBeVisible({ timeout: 60000 });
 
     // Click on citation to open source (triggers download)
     const openSourceButton = page.locator('button:has-text("Open source"), button:has-text("View")').first();

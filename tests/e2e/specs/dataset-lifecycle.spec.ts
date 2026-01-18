@@ -24,10 +24,9 @@ test.describe('Dataset Lifecycle', () => {
     // Wait for dataset to appear in list
     await page.waitForSelector(`text=${datasetName}`, { timeout: 10000 });
 
-    // Click the last "View dataset" button (newest dataset)
-    const viewButtons = page.locator('button:has-text("View dataset")');
-    const count = await viewButtons.count();
-    await viewButtons.nth(count - 1).click();
+    // Find and click the "View dataset" button for our specific dataset
+    const datasetCard = page.locator('.card', { hasText: datasetName });
+    await datasetCard.locator('button:has-text("View dataset")').click();
     await page.waitForURL(/datasetId=/, { timeout: 10000 });
 
     const url = new URL(page.url());
@@ -36,9 +35,31 @@ test.describe('Dataset Lifecycle', () => {
 
     console.log(`Created dataset: ${datasetId}`);
 
-    // Step 2: Upload File
-    const pdfContent = generateMinimalPDF('E2E Test Document Content for RagReady');
-    const pdfBuffer = Buffer.from(pdfContent);
+    // Step 2: Upload File (using pdf-lib for proper PDF generation)
+    // Content needs to be long enough for chunking (min 800 chars for optimal processing)
+    const pdfBuffer = await generateMinimalPDF(
+      `RAGREADY PLATFORM TEST DOCUMENT
+
+SECTION 1: INTRODUCTION
+
+This document is used for end-to-end testing of the RagReady platform document processing pipeline. The pipeline extracts text from uploaded documents, processes the content, and prepares it for retrieval-augmented generation (RAG) operations.
+
+SECTION 2: DOCUMENT PROCESSING OVERVIEW
+
+The document processing pipeline consists of several stages including text extraction, normalization, quality checks, chunking, and vector embedding. Each stage validates the content and prepares it for the next step in the pipeline.
+
+SECTION 3: TEXT EXTRACTION
+
+Text extraction uses multiple methods to ensure reliable content extraction from PDF documents. The system first attempts extraction using pypdf, and falls back to pdfminer if the initial extraction yields insufficient text.
+
+SECTION 4: QUALITY ASSURANCE
+
+The quality assurance process evaluates extracted text for readiness scoring. This includes checking text length, identifying potential issues, and generating quality reports that help users understand document processing results.
+
+SECTION 5: VECTOR EMBEDDING
+
+After chunking, the system generates vector embeddings for each chunk using Amazon Bedrock. These embeddings enable semantic search and retrieval of relevant document sections during chat operations.`
+    );
 
     // Find file input and upload
     const fileInput = page.locator('input[type="file"]');

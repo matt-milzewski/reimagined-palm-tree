@@ -1,96 +1,60 @@
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+
 /**
- * Generate a minimal PDF for testing
- * This creates a PDF with properly encoded text that can be extracted by pypdf/pdfminer
+ * Generate a proper PDF for testing using pdf-lib
+ * This creates a PDF with text that can be extracted by pypdf/pdfminer
  */
-export function generateMinimalPDF(content: string = 'Test Document Content'): Buffer {
-  // Escape special PDF characters in content
-  const escapedContent = content
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
+export async function generateMinimalPDF(content: string = 'Test Document Content'): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.create();
+  const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
 
-  // Build content stream - using proper text object with positioning
-  const contentStream = `BT
-/F1 12 Tf
-1 0 0 1 72 720 Tm
-(${escapedContent}) Tj
-ET`;
+  const page = pdfDoc.addPage([612, 792]); // US Letter size
+  const { height } = page.getSize();
+  const fontSize = 12;
 
-  const streamLength = contentStream.length;
+  // Split content into lines that fit on the page
+  const maxWidth = 500;
+  // Replace newlines with spaces and split into words (filter out empty strings)
+  const words = content.replace(/\n+/g, ' ').split(' ').filter(w => w.length > 0);
+  const lines: string[] = [];
+  let currentLine = '';
 
-  // Build PDF with proper structure for text extraction
-  // Using explicit font encoding and proper xref table
-  const obj1 = `1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-`;
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const textWidth = timesRomanFont.widthOfTextAtSize(testLine, fontSize);
 
-  const obj2 = `2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-`;
+    if (textWidth <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
 
-  const obj3 = `3 0 obj
-<<
-  /Type /Page
-  /Parent 2 0 R
-  /MediaBox [0 0 612 792]
-  /Contents 4 0 R
-  /Resources <<
-    /Font << /F1 5 0 R >>
-  >>
->>
-endobj
-`;
+  // Draw each line
+  let yPosition = height - 72; // Start 1 inch from top
+  for (const line of lines) {
+    page.drawText(line, {
+      x: 72, // 1 inch margin
+      y: yPosition,
+      size: fontSize,
+      font: timesRomanFont,
+      color: rgb(0, 0, 0),
+    });
+    yPosition -= fontSize * 1.5; // Line spacing
+  }
 
-  const obj4 = `4 0 obj
-<< /Length ${streamLength} >>
-stream
-${contentStream}
-endstream
-endobj
-`;
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
 
-  const obj5 = `5 0 obj
-<<
-  /Type /Font
-  /Subtype /Type1
-  /BaseFont /Helvetica
-  /Encoding /WinAnsiEncoding
->>
-endobj
-`;
-
-  const header = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
-  const body = obj1 + obj2 + obj3 + obj4 + obj5;
-
-  // Calculate byte offsets for xref table
-  const headerLen = Buffer.from(header).length;
-  const obj1Start = headerLen;
-  const obj2Start = obj1Start + Buffer.from(obj1).length;
-  const obj3Start = obj2Start + Buffer.from(obj2).length;
-  const obj4Start = obj3Start + Buffer.from(obj3).length;
-  const obj5Start = obj4Start + Buffer.from(obj4).length;
-  const xrefStart = obj5Start + Buffer.from(obj5).length;
-
-  const xref = `xref
-0 6
-0000000000 65535 f
-${obj1Start.toString().padStart(10, '0')} 00000 n
-${obj2Start.toString().padStart(10, '0')} 00000 n
-${obj3Start.toString().padStart(10, '0')} 00000 n
-${obj4Start.toString().padStart(10, '0')} 00000 n
-${obj5Start.toString().padStart(10, '0')} 00000 n
-`;
-
-  const trailer = `trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-${xrefStart}
-%%EOF`;
-
-  const pdfContent = header + body + xref + trailer;
-  return Buffer.from(pdfContent, 'binary');
+/**
+ * Synchronous wrapper for generateMinimalPDF
+ * Note: This is async internally but returns a Promise
+ */
+export function generateMinimalPDFSync(content: string = 'Test Document Content'): Promise<Buffer> {
+  return generateMinimalPDF(content);
 }
 
 /**
