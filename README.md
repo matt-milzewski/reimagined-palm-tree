@@ -111,7 +111,7 @@ The vector ingestion pipeline uses Bedrock to embed chunks and OpenSearch Server
 OPENSEARCH_COLLECTION_ENDPOINT=https://<collection-id>.<region>.aoss.amazonaws.com
 OPENSEARCH_INDEX_NAME=ragready_chunks_v1
 BEDROCK_EMBED_MODEL_ID=amazon.titan-embed-text-v2:0
-BEDROCK_CHAT_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
+BEDROCK_CHAT_MODEL_ID=au.anthropic.claude-haiku-4-5-20251001-v1:0
 EMBEDDING_DIMENSION=1024
 CHAT_TOP_K_DEFAULT=8
 INGEST_BATCH_SIZE=50

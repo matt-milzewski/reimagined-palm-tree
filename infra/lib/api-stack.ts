@@ -37,7 +37,7 @@ export class ApiStack extends cdk.Stack {
     const chatModelId =
       this.node.tryGetContext('bedrockChatModelId') ||
       process.env.BEDROCK_CHAT_MODEL_ID ||
-      'anthropic.claude-3-5-haiku-20241022-v1:0';
+      'au.anthropic.claude-haiku-4-5-20251001-v1:0';
     const embeddingDimension =
       this.node.tryGetContext('embeddingDimension') ||
       process.env.EMBEDDING_DIMENSION ||

@@ -121,17 +121,18 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
     await page.waitForSelector('select#dataset-picker:not([disabled])', { timeout: 15000 });
 
     const selectElement = page.locator('select#dataset-picker');
+    const datasetOption = selectElement.locator(`option[value="${datasetId}"]`);
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(500);
-        const options = await selectElement.locator('option').allTextContents();
-        return options.some(opt => opt.includes(datasetName) && opt.includes('READY'));
+        const label = await datasetOption.textContent();
+        return Boolean(label && label.includes('READY'));
       },
       { timeout: 120000, interval: 3000, timeoutMessage: 'Dataset did not become READY' }
     );
 
-    await selectElement.selectOption({ label: new RegExp(datasetName) });
+    await selectElement.selectOption(datasetId);
     await expect(page.locator('.badge:has-text("READY")')).toBeVisible({ timeout: 5000 });
 
     console.log('Dataset lifecycle test completed successfully');

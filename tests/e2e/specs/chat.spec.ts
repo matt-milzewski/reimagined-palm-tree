@@ -93,21 +93,21 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
 
     // Select the dataset - find option that contains our dataset ID
     const selectElement = page.locator('select#dataset-picker');
+    const datasetOption = selectElement.locator(`option[value="${datasetId}"]`);
 
-    // Wait for our dataset option to appear and be enabled (READY status)
+    // Wait for our dataset option to appear and be READY
     // Vector ingestion with Bedrock embeddings can take time
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(500);
-        const options = await selectElement.locator('option').allTextContents();
-        const readyOption = options.find(opt => opt.includes(datasetName) && opt.includes('READY'));
-        return !!readyOption;
+        const label = await datasetOption.textContent();
+        return Boolean(label && label.includes('READY'));
       },
       { timeout: 120000, interval: 3000, timeoutMessage: 'Dataset did not become READY' }
     );
 
-    await selectElement.selectOption({ label: new RegExp(datasetName) });
+    await selectElement.selectOption(datasetId);
 
     // Wait for status badge
     await expect(page.locator('.badge:has-text("READY")')).toBeVisible({ timeout: 5000 });
@@ -209,17 +209,18 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
 
     // Wait for dataset to be READY (vector ingestion with Bedrock can take time)
     const selectElement = page.locator('select#dataset-picker');
+    const datasetOption = selectElement.locator(`option[value="${datasetId}"]`);
     await waitFor(
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(500);
-        const options = await selectElement.locator('option').allTextContents();
-        return options.some(opt => opt.includes(datasetName) && opt.includes('READY'));
+        const label = await datasetOption.textContent();
+        return Boolean(label && label.includes('READY'));
       },
       { timeout: 120000, interval: 3000, timeoutMessage: 'Dataset did not become READY' }
     );
 
-    await selectElement.selectOption({ label: new RegExp(datasetName) });
+    await selectElement.selectOption(datasetId);
 
     // Send message
     const chatInput = page.locator('textarea');
