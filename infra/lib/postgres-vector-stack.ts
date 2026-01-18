@@ -8,6 +8,7 @@ export class PostgresVectorStack extends cdk.Stack {
   public readonly dbInstance: rds.DatabaseInstance;
   public readonly dbSecret: secretsmanager.ISecret;
   public readonly dbSecurityGroup: ec2.SecurityGroup;
+  public readonly lambdaSecurityGroup: ec2.SecurityGroup;
   public readonly dbEndpoint: string;
   public readonly dbPort: number;
   public readonly databaseName: string;
@@ -35,6 +36,44 @@ export class PostgresVectorStack extends cdk.Stack {
       ec2.Port.tcp(5432),
       'Allow PostgreSQL from VPC'
     );
+
+    // Security group for Lambda functions in VPC
+    this.lambdaSecurityGroup = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
+      vpc: this.vpc,
+      description: 'Security group for RagReady Lambda functions',
+      allowAllOutbound: true
+    });
+
+    this.dbSecurityGroup.addIngressRule(
+      this.lambdaSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL from Lambda'
+    );
+
+    this.vpc.addGatewayEndpoint('S3GatewayEndpoint', {
+      service: ec2.GatewayVpcEndpointAwsService.S3
+    });
+
+    this.vpc.addGatewayEndpoint('DynamoDbGatewayEndpoint', {
+      service: ec2.GatewayVpcEndpointAwsService.DYNAMODB
+    });
+
+    const interfaceEndpoints = [
+      { id: 'SecretsManagerEndpoint', service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER },
+      { id: 'CloudWatchLogsEndpoint', service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS },
+      { id: 'CloudWatchMonitoringEndpoint', service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING },
+      { id: 'SqsEndpoint', service: ec2.InterfaceVpcEndpointAwsService.SQS },
+      { id: 'StepFunctionsEndpoint', service: ec2.InterfaceVpcEndpointAwsService.STEP_FUNCTIONS },
+      { id: 'BedrockRuntimeEndpoint', service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME },
+      { id: 'SesV2Endpoint', service: ec2.InterfaceVpcEndpointAwsService.EMAIL }
+    ];
+
+    for (const endpoint of interfaceEndpoints) {
+      this.vpc.addInterfaceEndpoint(endpoint.id, {
+        service: endpoint.service,
+        subnets: { subnetType: ec2.SubnetType.PUBLIC }
+      });
+    }
 
     // Database credentials stored in Secrets Manager
     this.dbSecret = new secretsmanager.Secret(this, 'RdsCredentials', {

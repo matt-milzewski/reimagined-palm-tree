@@ -6,6 +6,7 @@ import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as path from 'path';
 import { StorageStack } from './storage-stack';
 import { PostgresVectorStack } from './postgres-vector-stack';
@@ -69,7 +70,11 @@ export class PipelineStack extends cdk.Stack {
         runtime: lambda.Runtime.PYTHON_3_11,
         timeout: cdk.Duration.seconds(timeoutSeconds),
         memorySize: 512,
-        environment: envVars
+        environment: envVars,
+        vpc: props.postgresVector.vpc,
+        vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+        securityGroups: [props.postgresVector.lambdaSecurityGroup],
+        allowPublicSubnet: true
       });
 
     const markRunningFn = createPipelineFn('MarkRunningFn', 'mark_running.py', 30);
@@ -188,7 +193,11 @@ export class PipelineStack extends cdk.Stack {
       environment: {
         ...envVars,
         STATE_MACHINE_ARN: this.stateMachine.stateMachineArn
-      }
+      },
+      vpc: props.postgresVector.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      securityGroups: [props.postgresVector.lambdaSecurityGroup],
+      allowPublicSubnet: true
     });
 
     dispatcherFn.addEventSource(new lambdaEventSources.SqsEventSource(props.storage.ingestionQueue));

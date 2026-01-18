@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 import { StorageStack } from './storage-stack';
@@ -51,6 +52,10 @@ export class ApiStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
       memorySize: 512,
       timeout: cdk.Duration.seconds(60),
+      vpc: props.postgresVector.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      securityGroups: [props.postgresVector.lambdaSecurityGroup],
+      allowPublicSubnet: true,
       environment: {
         DATASETS_TABLE: props.storage.datasetsTable.tableName,
         FILES_TABLE: props.storage.filesTable.tableName,

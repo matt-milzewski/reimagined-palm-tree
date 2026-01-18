@@ -80,9 +80,9 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
       async () => {
         await page.click('button:has-text("Refresh")');
         await page.waitForTimeout(1000);
-        // Check for View results button which indicates processing is done
-        const viewResultsButton = await page.locator('button:has-text("View results")').count();
-        return viewResultsButton > 0;
+        const completeStatus = await page.locator('td:has-text("COMPLETE")').count();
+        const failedStatus = await page.locator('td:has-text("FAILED")').count();
+        return completeStatus > 0 || failedStatus > 0;
       },
       {
         timeout: 180000, // 3 minutes
@@ -91,7 +91,16 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
       }
     );
 
-    // Verify results button is available
+    const failedStatus = await page.locator('td:has-text("FAILED")').count();
+    if (failedStatus > 0) {
+      const jobCell = await page.locator('table tbody tr td:nth-child(3)').textContent().catch(() => 'unknown');
+      await page.click('button:has-text("View results")');
+      await page.waitForTimeout(2000);
+      const errorMessage = await page.locator('text=/error|Error/i').first().textContent().catch(() => 'Unknown error');
+      throw new Error(`File processing FAILED. Error: ${errorMessage}. Job ID: ${jobCell}`);
+    }
+
+    await expect(page.locator('td:has-text("COMPLETE")')).toBeVisible();
     await expect(page.locator('button:has-text("View results")')).toBeVisible();
 
     // Step 4: View Results
@@ -106,6 +115,24 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
     // Verify job results are displayed (readiness score and status)
     const hasScore = await page.locator('text=/score|readiness|status/i').count();
     expect(hasScore).toBeGreaterThan(0);
+
+    // Step 5: Verify dataset is READY for chat
+    await page.goto('/chat/index.html');
+    await page.waitForSelector('select#dataset-picker:not([disabled])', { timeout: 15000 });
+
+    const selectElement = page.locator('select#dataset-picker');
+    await waitFor(
+      async () => {
+        await page.click('button:has-text("Refresh")');
+        await page.waitForTimeout(500);
+        const options = await selectElement.locator('option').allTextContents();
+        return options.some(opt => opt.includes(datasetName) && opt.includes('READY'));
+      },
+      { timeout: 120000, interval: 3000, timeoutMessage: 'Dataset did not become READY' }
+    );
+
+    await selectElement.selectOption({ label: new RegExp(datasetName) });
+    await expect(page.locator('.badge:has-text("READY")')).toBeVisible({ timeout: 5000 });
 
     console.log('Dataset lifecycle test completed successfully');
   });
