@@ -269,15 +269,17 @@ async function invokeChatModel(
 
   let body = '';
   const modelId = BEDROCK_CHAT_MODEL_ID;
+  const isAnthropicModel = modelId.toLowerCase().includes('anthropic.');
 
-  if (modelId.startsWith('anthropic.')) {
-    const messages: Array<{ role: string; content: string }> = [];
+  if (isAnthropicModel) {
+    const messages: Array<{ role: string; content: Array<{ type: string; text: string }> }> = [];
 
     for (const msg of conversationHistory) {
-      messages.push({ role: msg.role, content: msg.content });
+      if (!msg.content) continue;
+      messages.push({ role: msg.role, content: [{ type: 'text', text: msg.content }] });
     }
 
-    messages.push({ role: 'user', content: prompt });
+    messages.push({ role: 'user', content: [{ type: 'text', text: prompt }] });
 
     body = JSON.stringify({
       anthropic_version: 'bedrock-2023-05-31',
@@ -310,7 +312,7 @@ async function invokeChatModel(
   const response = await bedrock.send(command);
   const payload = JSON.parse(await readBody(response.body));
 
-  if (modelId.startsWith('anthropic.')) {
+  if (isAnthropicModel) {
     const content = Array.isArray(payload.content) ? payload.content : [];
     const text = content.map((part: any) => part.text || '').join('');
     if (text) return text;

@@ -38,6 +38,7 @@ export class ApiStack extends cdk.Stack {
       this.node.tryGetContext('bedrockChatModelId') ||
       process.env.BEDROCK_CHAT_MODEL_ID ||
       'au.anthropic.claude-haiku-4-5-20251001-v1:0';
+    const chatModelIdBase = chatModelId.replace(/^au\./, '');
     const embeddingDimension =
       this.node.tryGetContext('embeddingDimension') ||
       process.env.EMBEDDING_DIMENSION ||
@@ -46,6 +47,7 @@ export class ApiStack extends cdk.Stack {
       this.node.tryGetContext('chatTopKDefault') ||
       process.env.CHAT_TOP_K_DEFAULT ||
       '8';
+    const bedrockInvokeActions = ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'];
 
     const apiFn = new NodejsFunction(this, 'ApiHandler', {
       entry: path.join(__dirname, '../../backend/api/src/handler.ts'),
@@ -99,14 +101,25 @@ export class ApiStack extends cdk.Stack {
     );
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['bedrock:InvokeModel'],
-        resources: [`arn:aws:bedrock:${this.region}::foundation-model/${embedModelId}`]
+        actions: bedrockInvokeActions,
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/${embedModelId}`
+        ]
       })
     );
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['bedrock:InvokeModel'],
-        resources: [`arn:aws:bedrock:${this.region}::foundation-model/${chatModelId}`]
+        actions: bedrockInvokeActions,
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/${chatModelId}`,
+          `arn:aws:bedrock:${this.region}::foundation-model/${chatModelIdBase}`,
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${chatModelId}`,
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
+          `arn:aws:bedrock:*::foundation-model/${chatModelId}`,
+          `arn:aws:bedrock:*::foundation-model/${chatModelIdBase}`,
+          `arn:aws:bedrock:*:${this.account}:inference-profile/${chatModelId}`,
+          `arn:aws:bedrock:*:${this.account}:inference-profile/*`
+        ]
       })
     );
 

@@ -118,7 +118,9 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
     await page.click('button:has-text("Send")');
 
     // Wait for assistant response
-    const assistantMessage = page.locator('.message').filter({ hasText: /safety|hard hat|induction|protective/i });
+    const assistantMessage = page
+      .locator('.chat-message.assistant .chat-content')
+      .filter({ hasText: /safety|hard hat|induction|protective/i });
     await expect(assistantMessage).toBeVisible({ timeout: 60000 });
 
     // Verify response has content
@@ -228,7 +230,9 @@ After chunking, the system generates vector embeddings for each chunk using Amaz
     await page.click('button:has-text("Send")');
 
     // Wait for response
-    await expect(page.locator('.message').filter({ hasText: /guidelines|safety|protective/i })).toBeVisible({ timeout: 60000 });
+    await expect(
+      page.locator('.chat-message.assistant .chat-content').filter({ hasText: /guidelines|safety|protective/i })
+    ).toBeVisible({ timeout: 60000 });
 
     // Click on citation to open source (triggers download)
     const openSourceButton = page.locator('button:has-text("Open source"), button:has-text("View")').first();
