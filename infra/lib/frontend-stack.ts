@@ -43,10 +43,38 @@ export class FrontendStack extends cdk.Stack {
         })
       : undefined;
 
+    const rewriteFunction = new cloudfront.Function(this, 'FrontendRewriteFunction', {
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+
+  if (uri.endsWith('/')) {
+    request.uri = uri + 'index.html';
+    return request;
+  }
+
+  var lastSlash = uri.lastIndexOf('/');
+  var lastSegment = uri.substring(lastSlash + 1);
+  if (lastSegment.indexOf('.') === -1) {
+    request.uri = uri + '/index.html';
+  }
+
+  return request;
+}
+`)
+    });
+
     this.distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
       defaultBehavior: {
         origin: new origins.S3Origin(this.hostingBucket, { originAccessIdentity }),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        functionAssociations: [
+          {
+            function: rewriteFunction,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
+          }
+        ]
       },
       defaultRootObject: 'index.html',
       domainNames,
