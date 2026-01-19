@@ -24,6 +24,13 @@ export type ChatMessage = {
   created_at: string;
 };
 
+export type ChatFilters = {
+  docTypes?: string[];
+  disciplines?: string[];
+  standards?: string[];
+  includeSuperseded?: boolean;
+};
+
 type ChatState = {
   messages: ChatMessage[];
   selectedMessageId?: string | null;
@@ -36,6 +43,7 @@ type UseChatParams = {
   datasetId?: string;
   accessToken?: string;
   topK?: number;
+  filters?: ChatFilters;
 };
 
 function nowIso() {
@@ -49,7 +57,7 @@ function newId() {
   return `msg_${Math.random().toString(36).slice(2)}`;
 }
 
-export function useChat({ datasetId, accessToken, topK }: UseChatParams) {
+export function useChat({ datasetId, accessToken, topK, filters }: UseChatParams) {
   const [state, setState] = useState<ChatState>({
     messages: [],
     selectedMessageId: null,
@@ -96,7 +104,8 @@ export function useChat({ datasetId, accessToken, topK }: UseChatParams) {
             dataset_id: datasetId,
             conversation_id: state.conversationId,
             message: content,
-            top_k: topK
+            top_k: topK,
+            filters
           }
         });
 
@@ -155,7 +164,7 @@ export function useChat({ datasetId, accessToken, topK }: UseChatParams) {
         }));
       }
     },
-    [accessToken, datasetId, topK, state.conversationId, updateMessage]
+    [accessToken, datasetId, filters, topK, state.conversationId, updateMessage]
   );
 
   const sendMessage = useCallback(

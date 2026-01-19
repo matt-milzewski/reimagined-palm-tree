@@ -8,7 +8,7 @@ import { ddb } from '../../shared/ddb';
 import { getTenantContext } from '../../shared/auth';
 import { log } from '../../shared/logger';
 import { newId } from '../../shared/ids';
-import { vectorSearch } from './postgres';
+import { vectorSearch, SearchFilters } from './postgres';
 import { validateDatasetForChat } from './chat-utils';
 
 const s3 = new S3Client({});
@@ -51,6 +51,69 @@ function parseJson(body?: string | null): any {
   } catch (error) {
     throw new Error('Invalid JSON body');
   }
+}
+
+function normalizeFilterValues(
+  value: unknown,
+  transform: (entry: string) => string
+): string[] | undefined {
+  if (!value) return undefined;
+  const rawValues = Array.isArray(value) ? value : [value];
+  const cleaned = rawValues
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => transform(entry.trim()))
+    .filter((entry) => entry.length > 0);
+  return cleaned.length ? cleaned : undefined;
+}
+
+function parseSearchFilters(body: Record<string, any>): SearchFilters | undefined {
+  const filters = body.filters && typeof body.filters === 'object' ? body.filters : {};
+  const docTypes = normalizeFilterValues(filters.docTypes ?? filters.doc_types, (entry) => entry.toLowerCase());
+  const disciplines = normalizeFilterValues(filters.disciplines ?? filters.discipline, (entry) => entry.toLowerCase());
+  const standards = normalizeFilterValues(filters.standards ?? filters.standards_referenced, (entry) => entry.toUpperCase());
+
+  if (!docTypes && !disciplines && !standards) {
+    return undefined;
+  }
+
+  return {
+    docTypes,
+    disciplines,
+    standards
+  };
+}
+
+function parseIncludeSuperseded(body: Record<string, any>): boolean {
+  const filters = body.filters && typeof body.filters === 'object' ? body.filters : {};
+  const value = filters.includeSuperseded ?? filters.include_superseded;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.toLowerCase() === 'true';
+  return false;
+}
+
+async function listSupersededFileIds(tenantId: string, datasetId: string): Promise<string[]> {
+  const tenantDatasetId = `${tenantId}#${datasetId}`;
+  const superseded: string[] = [];
+  let lastKey: Record<string, any> | undefined;
+
+  do {
+    const result = await ddb.send(
+      new QueryCommand({
+        TableName: FILES_TABLE,
+        KeyConditionExpression: 'tenantDatasetId = :td',
+        ExpressionAttributeValues: { ':td': tenantDatasetId },
+        ExclusiveStartKey: lastKey
+      })
+    );
+    for (const item of result.Items || []) {
+      if (item.isSuperseded) {
+        superseded.push(item.fileId);
+      }
+    }
+    lastKey = result.LastEvaluatedKey as Record<string, any> | undefined;
+  } while (lastKey);
+
+  return superseded;
 }
 
 function nowIso(): string {
@@ -533,6 +596,59 @@ async function handleGetFile(event: APIGatewayProxyEvent, datasetId: string, fil
   return jsonResponse(200, { file: fileResult.Item, job });
 }
 
+async function handleSupersedeFile(
+  event: APIGatewayProxyEvent,
+  datasetId: string,
+  fileId: string
+): Promise<APIGatewayProxyResult> {
+  const { tenantId, email, username } = getTenantContext(event);
+  const body = parseJson(event.body);
+  const supersededValue = body.superseded ?? body.isSuperseded;
+
+  if (typeof supersededValue !== 'boolean') {
+    return jsonResponse(400, { message: 'superseded must be a boolean.' });
+  }
+
+  const tenantDatasetId = `${tenantId}#${datasetId}`;
+  const existing = await ddb.send(
+    new GetCommand({
+      TableName: FILES_TABLE,
+      Key: { tenantDatasetId, fileId }
+    })
+  );
+
+  if (!existing.Item) {
+    return jsonResponse(404, { message: 'File not found.' });
+  }
+
+  const updateExpression = supersededValue
+    ? 'SET isSuperseded = :superseded, supersededAt = :supersededAt'
+    : 'SET isSuperseded = :superseded REMOVE supersededAt';
+
+  const expressionValues: Record<string, any> = { ':superseded': supersededValue };
+  if (supersededValue) {
+    expressionValues[':supersededAt'] = nowIso();
+  }
+
+  await ddb.send(
+    new UpdateCommand({
+      TableName: FILES_TABLE,
+      Key: { tenantDatasetId, fileId },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionValues
+    })
+  );
+
+  await putAudit(
+    tenantId,
+    supersededValue ? 'FILE_SUPERSEDED' : 'FILE_RESTORED',
+    { datasetId, fileId, superseded: supersededValue },
+    email || username || tenantId
+  );
+
+  return jsonResponse(200, { fileId, isSuperseded: supersededValue });
+}
+
 async function handleGetJob(event: APIGatewayProxyEvent, datasetId: string, fileId: string, jobId: string): Promise<APIGatewayProxyResult> {
   const { tenantId } = getTenantContext(event);
 
@@ -700,6 +816,8 @@ async function handleRagQuery(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   const datasetId = body.dataset_id || body.datasetId;
   const query = typeof body.query === 'string' ? body.query.trim() : body.query;
   const topK = Number.isFinite(body.top_k) ? Math.max(1, Math.min(body.top_k, 20)) : 8;
+  const filters = parseSearchFilters(body);
+  const includeSuperseded = parseIncludeSuperseded(body);
 
   if (!datasetId || typeof datasetId !== 'string') {
     return jsonResponse(400, { message: 'dataset_id is required.' });
@@ -711,11 +829,14 @@ async function handleRagQuery(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   const vector = await embedQuery(query);
 
   // Use PostgreSQL pgvector for similarity search
+  const excludeDocIds = includeSuperseded ? [] : await listSupersededFileIds(tenantId, datasetId);
   const hits = await vectorSearch({
     tenantId,
     datasetId,
     vector,
-    topK
+    topK,
+    filters,
+    excludeDocIds
   });
 
   const results = hits.map((hit) => ({
@@ -740,6 +861,8 @@ async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyR
   const topK = Number.isFinite(body.top_k)
     ? Math.max(1, Math.min(Number(body.top_k), 20))
     : Math.max(1, Math.min(CHAT_TOP_K_DEFAULT || 8, 20));
+  const filters = parseSearchFilters(body);
+  const includeSuperseded = parseIncludeSuperseded(body);
 
   if (!datasetId || typeof datasetId !== 'string') {
     return jsonResponse(400, { message: 'dataset_id is required.' });
@@ -819,11 +942,14 @@ async function handleChat(event: APIGatewayProxyEvent): Promise<APIGatewayProxyR
   const vector = await embedQuery(expandedQuery);
 
   // Use PostgreSQL pgvector for similarity search
+  const excludeDocIds = includeSuperseded ? [] : await listSupersededFileIds(tenantId, datasetId);
   const pgHits = await vectorSearch({
     tenantId,
     datasetId,
     vector,
-    topK
+    topK,
+    filters,
+    excludeDocIds
   });
 
   // Transform PostgreSQL results to match expected format for buildCitations
@@ -948,6 +1074,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     const presignMatch = path.match(/^\/datasets\/([^/]+)\/files\/presign$/);
     if (presignMatch && method === 'POST') {
       return await handlePresign(event, presignMatch[1]);
+    }
+
+    const supersedeMatch = path.match(/^\/datasets\/([^/]+)\/files\/([^/]+)\/supersede$/);
+    if (supersedeMatch && method === 'POST') {
+      return await handleSupersedeFile(event, supersedeMatch[1], supersedeMatch[2]);
     }
 
     const fileMatch = path.match(/^\/datasets\/([^/]+)\/files\/([^/]+)$/);

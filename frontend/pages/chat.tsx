@@ -7,15 +7,41 @@ import { ChatComposer } from '../components/ChatComposer';
 import { CitationsPanel } from '../components/CitationsPanel';
 import { apiRequest } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { Citation, useChat } from '../lib/useChat';
+import { Citation, ChatFilters, useChat } from '../lib/useChat';
 
 export default function ChatPage() {
   const router = useRouter();
   const { isAuthenticated, idToken, accessToken, loading } = useAuth();
   const [selectedDataset, setSelectedDataset] = useState<Dataset | undefined>();
+  const [filterState, setFilterState] = useState({
+    docTypes: '',
+    disciplines: '',
+    standards: '',
+    includeSuperseded: false
+  });
 
   const token = idToken || accessToken;
   const datasetId = selectedDataset?.datasetId;
+
+  const filters: ChatFilters | undefined = useMemo(() => {
+    const buildList = (value: string, transform: (entry: string) => string) =>
+      value
+        .split(',')
+        .map((entry) => transform(entry.trim()))
+        .filter((entry) => entry.length > 0);
+
+    const docTypes = buildList(filterState.docTypes, (entry) => entry.toLowerCase());
+    const disciplines = buildList(filterState.disciplines, (entry) => entry.toLowerCase());
+    const standards = buildList(filterState.standards, (entry) => entry.toUpperCase());
+
+    const nextFilters: ChatFilters = {};
+    if (docTypes.length) nextFilters.docTypes = docTypes;
+    if (disciplines.length) nextFilters.disciplines = disciplines;
+    if (standards.length) nextFilters.standards = standards;
+    if (filterState.includeSuperseded) nextFilters.includeSuperseded = true;
+
+    return Object.keys(nextFilters).length ? nextFilters : undefined;
+  }, [filterState]);
 
   const {
     messages,
@@ -26,7 +52,7 @@ export default function ChatPage() {
     sendMessage,
     retryMessage,
     selectMessage
-  } = useChat({ datasetId, accessToken: token });
+  } = useChat({ datasetId, accessToken: token, filters });
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -66,6 +92,51 @@ export default function ChatPage() {
           <div className="chat-header">
             <DatasetPicker value={datasetId} onSelect={setSelectedDataset} />
             {selectedDataset && <span className={statusClass}>{datasetStatus}</span>}
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label className="field-label" htmlFor="filter-doc-types">Doc types (comma-separated)</label>
+                <input
+                  id="filter-doc-types"
+                  className="input"
+                  placeholder="specification, contract"
+                  value={filterState.docTypes}
+                  onChange={(event) => setFilterState((prev) => ({ ...prev, docTypes: event.target.value }))}
+                />
+              </div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label className="field-label" htmlFor="filter-disciplines">Disciplines (comma-separated)</label>
+                <input
+                  id="filter-disciplines"
+                  className="input"
+                  placeholder="structural, electrical"
+                  value={filterState.disciplines}
+                  onChange={(event) => setFilterState((prev) => ({ ...prev, disciplines: event.target.value }))}
+                />
+              </div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <label className="field-label" htmlFor="filter-standards">Standards (comma-separated)</label>
+                <input
+                  id="filter-standards"
+                  className="input"
+                  placeholder="AS 3600, NCC"
+                  value={filterState.standards}
+                  onChange={(event) => setFilterState((prev) => ({ ...prev, standards: event.target.value }))}
+                />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={filterState.includeSuperseded}
+                  onChange={(event) =>
+                    setFilterState((prev) => ({ ...prev, includeSuperseded: event.target.checked }))
+                  }
+                />
+                Include superseded files in retrieval
+              </label>
+            </div>
           </div>
 
           {!selectedDataset && (

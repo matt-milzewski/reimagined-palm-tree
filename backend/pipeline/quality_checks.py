@@ -340,7 +340,8 @@ def handler(event, _context):
             "revision": current_revision,
             "documentDate": doc_date,
             "standards": standards[:10] if standards else [],
-            "isDrawing": is_drawing
+            "isDrawing": is_drawing,
+            "baseFilename": base_filename
         }
     })
 

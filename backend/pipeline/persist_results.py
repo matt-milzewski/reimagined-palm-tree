@@ -93,6 +93,17 @@ def handler(event, _context):
         tenant_dataset_id=f"{tenant_id}#{dataset_id}",
         file_id=file_id,
         updates={
+            **{
+                key: value
+                for key, value in {
+                    "revision": event.get("constructionMetadata", {}).get("revision"),
+                    "documentDate": event.get("constructionMetadata", {}).get("documentDate"),
+                    "baseFilename": event.get("constructionMetadata", {}).get("baseFilename"),
+                    "isDrawing": event.get("constructionMetadata", {}).get("isDrawing"),
+                    "standards": event.get("constructionMetadata", {}).get("standards")
+                }.items()
+                if value is not None
+            },
             "status": "COMPLETE",
             "latestJobId": job_id
         }

@@ -4,6 +4,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class StorageStack extends cdk.Stack {
   public readonly rawBucket: s3.Bucket;
@@ -33,6 +34,19 @@ export class StorageStack extends cdk.Stack {
         }
       ]
     });
+
+    this.rawBucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        sid: 'AllowTextractRead',
+        principals: [new iam.ServicePrincipal('textract.amazonaws.com')],
+        actions: ['s3:GetObject'],
+        resources: [this.rawBucket.arnForObjects('*')],
+        conditions: {
+          StringEquals: { 'aws:SourceAccount': this.account },
+          ArnLike: { 'aws:SourceArn': `arn:aws:textract:${this.region}:${this.account}:*` }
+        }
+      })
+    );
 
     this.processedBucket = new s3.Bucket(this, 'ProcessedBucket', {
       encryption: s3.BucketEncryption.S3_MANAGED,

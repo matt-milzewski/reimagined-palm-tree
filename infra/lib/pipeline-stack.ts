@@ -129,6 +129,17 @@ export class PipelineStack extends cdk.Stack {
     props.storage.auditTable.grantReadWriteData(failFn);
     props.storage.datasetsTable.grantReadWriteData(failFn);
 
+    extractTextFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'textract:DetectDocumentText',
+          'textract:StartDocumentTextDetection',
+          'textract:GetDocumentTextDetection'
+        ],
+        resources: ['*']
+      })
+    );
+
     vectorIngestFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],

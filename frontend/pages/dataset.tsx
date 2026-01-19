@@ -19,6 +19,7 @@ function FileTableSkeleton() {
           <td><div className="skeleton skeleton-cell status" /></td>
           <td><div className="skeleton skeleton-cell id" /></td>
           <td><div className="skeleton skeleton-cell button" /></td>
+          <td><div className="skeleton skeleton-cell button" /></td>
         </tr>
       ))}
     </>
@@ -135,6 +136,17 @@ export default function DatasetPage() {
     await loadFiles();
   };
 
+  const toggleSuperseded = async (fileId: string, superseded: boolean) => {
+    const token = idToken || accessToken;
+    if (!datasetKey || !token) return;
+    await apiRequest(`/datasets/${datasetKey}/files/${fileId}/supersede`, {
+      method: 'POST',
+      accessToken: token,
+      body: { superseded }
+    });
+    await loadFiles();
+  };
+
   return (
     <>
       <NavBar />
@@ -146,14 +158,14 @@ export default function DatasetPage() {
 
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label htmlFor="file-upload" className="sr-only">Upload PDF, DOC, DOCX, or CSV files</label>
+            <label htmlFor="file-upload" className="sr-only">Upload PDF, DOC, DOCX, CSV, or image files</label>
             <input
               id="file-upload"
               type="file"
-              accept=".pdf,.doc,.docx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
+              accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg,.tif,.tiff,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,image/png,image/jpeg,image/tiff"
               multiple
               onChange={handleUpload}
-              aria-label="Upload PDF, DOC, DOCX, or CSV files"
+              aria-label="Upload PDF, DOC, DOCX, CSV, or image files"
             />
             <button className="btn secondary" onClick={loadFiles} aria-label="Refresh file list">
               Refresh
@@ -192,6 +204,7 @@ export default function DatasetPage() {
                 <th>File</th>
                 <th>Status</th>
                 <th>Latest Job</th>
+                <th>Superseded</th>
                 <th></th>
               </tr>
             </thead>
@@ -200,8 +213,8 @@ export default function DatasetPage() {
                 <FileTableSkeleton />
               ) : files.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>
-                    No files uploaded yet. Use the file input above to upload PDF, DOC, DOCX, or CSV files.
+                  <td colSpan={5} style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>
+                    No files uploaded yet. Use the file input above to upload PDF, DOC, DOCX, CSV, or image files.
                   </td>
                 </tr>
               ) : (
@@ -210,6 +223,15 @@ export default function DatasetPage() {
                     <td>{file.filename}</td>
                     <td className={`status ${file.status?.toLowerCase()}`}>{file.status}</td>
                     <td>{file.latestJobId || '-'}</td>
+                    <td>
+                      <button
+                        className="btn secondary"
+                        onClick={() => toggleSuperseded(file.fileId, !file.isSuperseded)}
+                        disabled={file.status === 'PROCESSING'}
+                      >
+                        {file.isSuperseded ? 'Restore' : 'Supersede'}
+                      </button>
+                    </td>
                     <td>
                       {file.latestJobId && (
                         <button

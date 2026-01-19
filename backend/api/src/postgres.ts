@@ -22,6 +22,12 @@ export interface SearchResult {
   score: number;
 }
 
+export type SearchFilters = {
+  docTypes?: string[];
+  disciplines?: string[];
+  standards?: string[];
+};
+
 let pool: Pool | null = null;
 const secretsClient = new SecretsManagerClient({});
 
@@ -69,12 +75,45 @@ export async function vectorSearch(params: {
   datasetId: string;
   vector: number[];
   topK: number;
+  filters?: SearchFilters;
+  excludeDocIds?: string[];
 }): Promise<SearchResult[]> {
-  const { tenantId, datasetId, vector, topK } = params;
+  const { tenantId, datasetId, vector, topK, filters, excludeDocIds } = params;
   const db = await getPool();
 
   // Format vector as PostgreSQL array string for pgvector
   const vectorStr = `[${vector.join(',')}]`;
+
+  const conditions = ['tenant_id = $2', 'dataset_id = $3'];
+  const values: Array<string | number | string[]> = [vectorStr, tenantId, datasetId];
+  let paramIndex = 4;
+
+  if (filters?.docTypes?.length) {
+    conditions.push(`doc_type = ANY($${paramIndex}::text[])`);
+    values.push(filters.docTypes);
+    paramIndex += 1;
+  }
+
+  if (filters?.disciplines?.length) {
+    conditions.push(`discipline = ANY($${paramIndex}::text[])`);
+    values.push(filters.disciplines);
+    paramIndex += 1;
+  }
+
+  if (filters?.standards?.length) {
+    conditions.push(`standards_referenced && $${paramIndex}::text[]`);
+    values.push(filters.standards);
+    paramIndex += 1;
+  }
+
+  if (excludeDocIds?.length) {
+    conditions.push(`doc_id <> ALL($${paramIndex}::text[])`);
+    values.push(excludeDocIds);
+    paramIndex += 1;
+  }
+
+  const limitParam = `$${paramIndex}`;
+  values.push(topK);
 
   const result = await db.query<SearchResult>(
     `
@@ -84,11 +123,11 @@ export async function vectorSearch(params: {
       section_reference, standards_referenced,
       1 - (embedding <=> $1::vector) AS score
     FROM chunks
-    WHERE tenant_id = $2 AND dataset_id = $3
+    WHERE ${conditions.join(' AND ')}
     ORDER BY embedding <=> $1::vector
-    LIMIT $4
+    LIMIT ${limitParam}
     `,
-    [vectorStr, tenantId, datasetId, topK]
+    values
   );
 
   return result.rows;

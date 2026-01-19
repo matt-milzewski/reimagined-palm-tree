@@ -4,10 +4,12 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 import xml.etree.ElementTree as ElementTree
 from io import BytesIO, StringIO
 from typing import List, Optional
+import boto3
 from pypdf import PdfReader
 from pdfminer.high_level import extract_text as pdfminer_extract_text
 
@@ -19,6 +21,12 @@ from common.text import compute_extraction_stats, normalize_whitespace
 
 env = get_env()
 s3 = get_s3_client()
+textract = boto3.client("textract")
+
+OCR_TEXT_LENGTH_THRESHOLD = int(os.environ.get("OCR_TEXT_LENGTH_THRESHOLD", "50"))
+TEXTRACT_POLL_INTERVAL_SECONDS = int(os.environ.get("TEXTRACT_POLL_INTERVAL_SECONDS", "3"))
+TEXTRACT_POLL_TIMEOUT_SECONDS = int(os.environ.get("TEXTRACT_POLL_TIMEOUT_SECONDS", "90"))
+TEXTRACT_MAX_SYNC_BYTES = int(os.environ.get("TEXTRACT_MAX_SYNC_BYTES", str(5 * 1024 * 1024)))
 
 def extract_pages_pypdf(data: bytes):
     reader = PdfReader(BytesIO(data))
@@ -151,6 +159,70 @@ def extract_text_csv(data: bytes) -> str:
     return "\n".join(lines)
 
 
+def build_pages_from_textract_blocks(blocks: List[dict]) -> List[dict]:
+    pages = {}
+    for block in blocks or []:
+        if block.get("BlockType") != "LINE":
+            continue
+        text = block.get("Text") or ""
+        if not text:
+            continue
+        page_number = int(block.get("Page") or 1)
+        pages.setdefault(page_number, []).append(text)
+
+    results = []
+    for page_number in sorted(pages.keys()):
+        page_text = "\n".join(pages[page_number])
+        page_text = normalize_whitespace(page_text)
+        if page_text:
+            results.append({"pageNumber": page_number, "text": page_text})
+    return results
+
+
+def wait_for_textract_job(job_id: str) -> List[dict]:
+    deadline = time.time() + TEXTRACT_POLL_TIMEOUT_SECONDS
+    while True:
+        response = textract.get_document_text_detection(JobId=job_id)
+        status = response.get("JobStatus")
+        if status == "SUCCEEDED":
+            blocks = response.get("Blocks", [])
+            next_token = response.get("NextToken")
+            while next_token:
+                response = textract.get_document_text_detection(JobId=job_id, NextToken=next_token)
+                blocks.extend(response.get("Blocks", []))
+                next_token = response.get("NextToken")
+            return blocks
+        if status == "FAILED":
+            message = response.get("StatusMessage") or "Textract job failed."
+            raise Exception(message)
+        if time.time() >= deadline:
+            raise Exception("Textract job timed out.")
+        time.sleep(TEXTRACT_POLL_INTERVAL_SECONDS)
+
+
+def extract_pages_textract_bytes(data: bytes) -> List[dict]:
+    response = textract.detect_document_text(Document={"Bytes": data})
+    blocks = response.get("Blocks", [])
+    return build_pages_from_textract_blocks(blocks)
+
+
+def extract_pages_textract_s3(bucket: str, key: str) -> List[dict]:
+    response = textract.start_document_text_detection(
+        DocumentLocation={"S3Object": {"Bucket": bucket, "Name": key}}
+    )
+    job_id = response.get("JobId")
+    if not job_id:
+        raise Exception("Textract job did not return a JobId.")
+    blocks = wait_for_textract_job(job_id)
+    return build_pages_from_textract_blocks(blocks)
+
+
+def extract_pages_textract_image(data: bytes, bucket: str, key: str) -> List[dict]:
+    if len(data) <= TEXTRACT_MAX_SYNC_BYTES:
+        return extract_pages_textract_bytes(data)
+    return extract_pages_textract_s3(bucket, key)
+
+
 def resolve_libreoffice_binary() -> str:
     override = os.environ.get("LIBREOFFICE_BIN") or os.environ.get("SOFFICE_BIN")
     if override:
@@ -221,6 +293,8 @@ def detect_file_type(filename: str, content_type: Optional[str]) -> str:
             return "doc"
         if lower in ("text/csv", "application/csv"):
             return "csv"
+        if lower in ("image/png", "image/jpeg", "image/jpg", "image/tiff"):
+            return "image"
 
     extension = os.path.splitext(filename or "")[1].lower()
     if extension == ".pdf":
@@ -231,6 +305,8 @@ def detect_file_type(filename: str, content_type: Optional[str]) -> str:
         return "doc"
     if extension == ".csv":
         return "csv"
+    if extension in (".png", ".jpg", ".jpeg", ".tif", ".tiff"):
+        return "image"
     return "unknown"
 
 
@@ -251,6 +327,8 @@ def handler(event, _context):
     extraction_method = None
     pypdf_error = None
     pdfminer_error = None
+    textract_error = None
+    ocr_used = False
     file_type = detect_file_type(filename, content_type)
 
     if file_type == "pdf":
@@ -270,8 +348,17 @@ def handler(event, _context):
             except Exception as error:
                 pdfminer_error = str(error)
 
-        if extraction_stats["textLength"] < 50:
-            message = "No extractable text using pypdf or pdfminer. Scanned PDF not supported in MVP."
+        if extraction_stats["textLength"] < OCR_TEXT_LENGTH_THRESHOLD:
+            try:
+                pages = extract_pages_textract_s3(env["RAW_BUCKET"], raw_key)
+                extraction_method = "textract"
+                ocr_used = True
+                extraction_stats = compute_extraction_stats(pages)
+            except Exception as error:
+                textract_error = str(error)
+
+        if extraction_stats["textLength"] < OCR_TEXT_LENGTH_THRESHOLD:
+            message = "No extractable text using pypdf, pdfminer, or Textract. Scanned PDF not supported in MVP."
             raise Exception(message)
     elif file_type == "docx":
         extraction_method = "docx"
@@ -295,14 +382,24 @@ def handler(event, _context):
         extraction_stats = compute_extraction_stats(pages)
         if extraction_stats["textLength"] < 20:
             raise Exception("No extractable text found in CSV document.")
+    elif file_type == "image":
+        extraction_method = "textract"
+        pages = extract_pages_textract_image(data, env["RAW_BUCKET"], raw_key)
+        extraction_stats = compute_extraction_stats(pages)
+        ocr_used = True
+        if extraction_stats["textLength"] < 20:
+            raise Exception("No extractable text found in image document.")
     else:
-        raise Exception("Unsupported file type. Please upload PDF, DOC, DOCX, or CSV.")
+        raise Exception("Unsupported file type. Please upload PDF, DOC, DOCX, CSV, or an image.")
 
     extraction_stats["method"] = extraction_method
+    extraction_stats["ocrUsed"] = ocr_used
     if pypdf_error:
         extraction_stats["pypdfError"] = pypdf_error
     if pdfminer_error:
         extraction_stats["pdfminerError"] = pdfminer_error
+    if textract_error:
+        extraction_stats["textractError"] = textract_error
 
     base_prefix = f"processed/{tenant_id}/{dataset_id}/{file_id}"
     extracted_text_key = f"{base_prefix}/extracted.txt"

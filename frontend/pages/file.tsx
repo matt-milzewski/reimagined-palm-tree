@@ -135,6 +135,21 @@ export default function FileResultsPage() {
           </div>
         </div>
 
+        {file && (
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h3 style={{ marginTop: 0 }}>Document metadata</h3>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div>Base filename: {file.baseFilename || '-'}</div>
+              <div>Revision: {file.revision || '-'}</div>
+              <div>Document date: {file.documentDate || '-'}</div>
+              <div>Drawing: {file.isDrawing ? 'Yes' : 'No'}</div>
+              {Array.isArray(file.standards) && file.standards.length > 0 && (
+                <div>Standards: {file.standards.join(', ')}</div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Findings</h3>
           {isLoadingReport ? (
