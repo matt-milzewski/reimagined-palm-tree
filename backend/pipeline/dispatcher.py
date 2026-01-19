@@ -83,7 +83,8 @@ def handler(event, _context):
                     "fileId": file_id,
                     "jobId": job_id,
                     "rawS3Key": parsed["rawS3Key"],
-                    "filename": file_item.get("filename") or parsed.get("filename")
+                    "filename": file_item.get("filename") or parsed.get("filename"),
+                    "contentType": file_item.get("contentType")
                 })
             )
 

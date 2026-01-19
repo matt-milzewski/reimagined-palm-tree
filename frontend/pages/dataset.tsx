@@ -146,14 +146,14 @@ export default function DatasetPage() {
 
         <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label htmlFor="file-upload" className="sr-only">Upload PDF files</label>
+            <label htmlFor="file-upload" className="sr-only">Upload PDF, DOC, DOCX, or CSV files</label>
             <input
               id="file-upload"
               type="file"
-              accept="application/pdf"
+              accept=".pdf,.doc,.docx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
               multiple
               onChange={handleUpload}
-              aria-label="Upload PDF files"
+              aria-label="Upload PDF, DOC, DOCX, or CSV files"
             />
             <button className="btn secondary" onClick={loadFiles} aria-label="Refresh file list">
               Refresh
@@ -201,7 +201,7 @@ export default function DatasetPage() {
               ) : files.length === 0 ? (
                 <tr>
                   <td colSpan={4} style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>
-                    No files uploaded yet. Use the file input above to upload PDFs.
+                    No files uploaded yet. Use the file input above to upload PDF, DOC, DOCX, or CSV files.
                   </td>
                 </tr>
               ) : (

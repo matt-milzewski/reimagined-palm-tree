@@ -78,7 +78,19 @@ export class PipelineStack extends cdk.Stack {
       });
 
     const markRunningFn = createPipelineFn('MarkRunningFn', 'mark_running.py', 30);
-    const extractTextFn = createPipelineFn('ExtractTextFn', 'extract_text.py', 120);
+    const extractTextFn = new lambda.DockerImageFunction(this, 'ExtractTextFn', {
+      code: lambda.DockerImageCode.fromImageAsset(entryPath, {
+        file: 'docker/extract_text/Dockerfile'
+      }),
+      architecture: lambda.Architecture.X86_64,
+      timeout: cdk.Duration.seconds(120),
+      memorySize: 2048,
+      environment: envVars,
+      vpc: props.postgresVector.vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      securityGroups: [props.postgresVector.lambdaSecurityGroup],
+      allowPublicSubnet: true
+    });
     const normalizeFn = createPipelineFn('NormalizeFn', 'normalize.py', 60);
     const qualityFn = createPipelineFn('QualityChecksFn', 'quality_checks.py', 60);
     const chunkFn = createPipelineFn('ChunkFn', 'chunk.py', 60);
