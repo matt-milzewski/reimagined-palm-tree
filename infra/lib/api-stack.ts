@@ -90,6 +90,8 @@ export class ApiStack extends cdk.Stack {
     props.storage.rawBucket.grantPut(apiFn);
     props.storage.rawBucket.grantRead(apiFn);
     props.storage.processedBucket.grantRead(apiFn);
+    props.storage.rawBucket.grantDelete(apiFn);
+    props.storage.processedBucket.grantDelete(apiFn);
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ses:SendEmail', 'ses:SendRawEmail'],
@@ -130,7 +132,7 @@ export class ApiStack extends cdk.Stack {
       restApiName: 'RagReady API',
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: ['GET', 'POST', 'OPTIONS'],
+        allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
         allowHeaders: ['Authorization', 'Content-Type']
       }
     });

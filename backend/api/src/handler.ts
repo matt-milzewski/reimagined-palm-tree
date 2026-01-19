@@ -1,6 +1,12 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand
+} from '@aws-sdk/client-s3';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -8,7 +14,7 @@ import { ddb } from '../../shared/ddb';
 import { getTenantContext } from '../../shared/auth';
 import { log } from '../../shared/logger';
 import { newId } from '../../shared/ids';
-import { vectorSearch, SearchFilters } from './postgres';
+import { deleteDatasetChunks, vectorSearch, SearchFilters } from './postgres';
 import { validateDatasetForChat } from './chat-utils';
 
 const s3 = new S3Client({});
@@ -33,7 +39,7 @@ const MESSAGES_TABLE = process.env.MESSAGES_TABLE || '';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Authorization,Content-Type',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
 };
 
 function jsonResponse(statusCode: number, body: unknown): APIGatewayProxyResult {
@@ -114,6 +120,125 @@ async function listSupersededFileIds(tenantId: string, datasetId: string): Promi
   } while (lastKey);
 
   return superseded;
+}
+
+async function deleteS3Prefix(bucket: string, prefix: string): Promise<void> {
+  if (!bucket) return;
+  let continuationToken: string | undefined;
+  do {
+    const listResponse = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken
+      })
+    );
+
+    const objects = (listResponse.Contents || [])
+      .map((item) => item.Key)
+      .filter((key): key is string => Boolean(key))
+      .map((key) => ({ Key: key }));
+
+    if (objects.length > 0) {
+      await s3.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: objects }
+        })
+      );
+    }
+
+    continuationToken = listResponse.NextContinuationToken;
+  } while (continuationToken);
+}
+
+async function deleteJobsForFile(tenantId: string, fileId: string): Promise<void> {
+  const tenantFileId = `${tenantId}#${fileId}`;
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: JOBS_TABLE,
+      KeyConditionExpression: 'tenantFileId = :tf',
+      ExpressionAttributeValues: { ':tf': tenantFileId }
+    })
+  );
+
+  for (const item of result.Items || []) {
+    if (!item.jobId) continue;
+    await ddb.send(
+      new DeleteCommand({
+        TableName: JOBS_TABLE,
+        Key: { tenantFileId, jobId: item.jobId }
+      })
+    );
+  }
+}
+
+async function deleteFilesForDataset(tenantId: string, datasetId: string): Promise<string[]> {
+  const tenantDatasetId = `${tenantId}#${datasetId}`;
+  const result = await ddb.send(
+    new QueryCommand({
+      TableName: FILES_TABLE,
+      KeyConditionExpression: 'tenantDatasetId = :td',
+      ExpressionAttributeValues: { ':td': tenantDatasetId }
+    })
+  );
+
+  const files = result.Items || [];
+  for (const file of files) {
+    await deleteJobsForFile(tenantId, file.fileId);
+    await ddb.send(
+      new DeleteCommand({
+        TableName: FILES_TABLE,
+        Key: { tenantDatasetId, fileId: file.fileId }
+      })
+    );
+  }
+  return files.map((file) => file.fileId as string);
+}
+
+async function deleteConversationsForDataset(tenantId: string, datasetId: string): Promise<void> {
+  const conversations = await ddb.send(
+    new QueryCommand({
+      TableName: CONVERSATIONS_TABLE,
+      KeyConditionExpression: 'tenantId = :tid',
+      FilterExpression: 'datasetId = :did',
+      ExpressionAttributeValues: {
+        ':tid': tenantId,
+        ':did': datasetId
+      }
+    })
+  );
+
+  for (const conversation of conversations.Items || []) {
+    const conversationId = conversation.conversationId as string;
+    const tenantConversationId = `${tenantId}#${conversationId}`;
+    const messages = await ddb.send(
+      new QueryCommand({
+        TableName: MESSAGES_TABLE,
+        KeyConditionExpression: 'tenantConversationId = :tc',
+        ExpressionAttributeValues: { ':tc': tenantConversationId }
+      })
+    );
+
+    for (const message of messages.Items || []) {
+      await ddb.send(
+        new DeleteCommand({
+          TableName: MESSAGES_TABLE,
+          Key: {
+            tenantConversationId,
+            createdAtMessageId: message.createdAtMessageId
+          }
+        })
+      );
+    }
+
+    await ddb.send(
+      new DeleteCommand({
+        TableName: CONVERSATIONS_TABLE,
+        Key: { tenantId, conversationId }
+      })
+    );
+  }
 }
 
 function nowIso(): string {
@@ -478,6 +603,54 @@ async function handleCreateDataset(event: APIGatewayProxyEvent): Promise<APIGate
   await putAudit(tenantId, 'DATASET_CREATED', { datasetId, name: body.name.trim() }, email || username || tenantId);
 
   return jsonResponse(201, { datasetId, name: body.name.trim(), createdAt });
+}
+
+async function handleDeleteDataset(event: APIGatewayProxyEvent, datasetId: string): Promise<APIGatewayProxyResult> {
+  const { tenantId, email, username } = getTenantContext(event);
+
+  const datasetResult = await ddb.send(
+    new GetCommand({
+      TableName: DATASETS_TABLE,
+      Key: { tenantId, datasetId }
+    })
+  );
+
+  if (!datasetResult.Item) {
+    return jsonResponse(404, { message: 'Dataset not found.' });
+  }
+
+  const tenantDatasetId = `${tenantId}#${datasetId}`;
+  const filesResult = await ddb.send(
+    new QueryCommand({
+      TableName: FILES_TABLE,
+      KeyConditionExpression: 'tenantDatasetId = :td',
+      ExpressionAttributeValues: { ':td': tenantDatasetId }
+    })
+  );
+  const files = filesResult.Items || [];
+  const hasActiveProcessing = files.some((file) =>
+    ['UPLOADED_PENDING', 'PROCESSING'].includes(file.status)
+  );
+  if (hasActiveProcessing) {
+    return jsonResponse(409, { message: 'Dataset has active processing. Try again once files are complete.' });
+  }
+
+  await deleteDatasetChunks(tenantId, datasetId);
+  await deleteFilesForDataset(tenantId, datasetId);
+  await deleteS3Prefix(RAW_BUCKET, `raw/${tenantId}/${datasetId}/`);
+  await deleteS3Prefix(PROCESSED_BUCKET, `processed/${tenantId}/${datasetId}/`);
+  await deleteConversationsForDataset(tenantId, datasetId);
+
+  await ddb.send(
+    new DeleteCommand({
+      TableName: DATASETS_TABLE,
+      Key: { tenantId, datasetId }
+    })
+  );
+
+  await putAudit(tenantId, 'DATASET_DELETED', { datasetId }, email || username || tenantId);
+
+  return jsonResponse(200, { datasetId, deleted: true });
 }
 
 async function handleListFiles(event: APIGatewayProxyEvent, datasetId: string): Promise<APIGatewayProxyResult> {
@@ -1064,6 +1237,11 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (path === '/datasets' && method === 'POST') {
       return await handleCreateDataset(event);
+    }
+
+    const datasetMatch = path.match(/^\/datasets\/([^/]+)$/);
+    if (datasetMatch && method === 'DELETE') {
+      return await handleDeleteDataset(event, datasetMatch[1]);
     }
 
     const datasetFilesMatch = path.match(/^\/datasets\/([^/]+)\/files$/);

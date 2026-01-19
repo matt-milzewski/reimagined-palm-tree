@@ -139,3 +139,8 @@ export async function closePool(): Promise<void> {
     pool = null;
   }
 }
+
+export async function deleteDatasetChunks(tenantId: string, datasetId: string): Promise<void> {
+  const db = await getPool();
+  await db.query('DELETE FROM chunks WHERE tenant_id = $1 AND dataset_id = $2', [tenantId, datasetId]);
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import { apiRequest } from '../lib/api';
+import { apiRequest, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { NavBar } from '../components/NavBar';
 
@@ -154,6 +154,30 @@ export default function DashboardPage() {
     }
   };
 
+  const deleteDataset = async (datasetId: string, datasetName?: string) => {
+    const token = idToken || accessToken;
+    if (!token) return;
+    const confirmed = window.confirm(
+      `Delete dataset "${datasetName || datasetId}"? This removes files, jobs, and conversations.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      await apiRequest(`/datasets/${datasetId}`, {
+        method: 'DELETE',
+        accessToken: token
+      });
+      await loadDatasets();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || 'Failed to delete dataset.');
+      } else {
+        setError('Failed to delete dataset.');
+      }
+    }
+  };
+
   return (
     <>
       <NavBar />
@@ -286,6 +310,13 @@ export default function DashboardPage() {
                     onClick={() => router.push(`/dataset?datasetId=${dataset.datasetId}`)}
                   >
                     View dataset
+                  </button>
+                  <button
+                    className="btn secondary"
+                    style={{ marginTop: 8 }}
+                    onClick={() => deleteDataset(dataset.datasetId, dataset.name)}
+                  >
+                    Delete dataset
                   </button>
                 </div>
               );
