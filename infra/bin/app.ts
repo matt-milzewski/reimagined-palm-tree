@@ -14,27 +14,31 @@ const env = {
   region: process.env.CDK_DEFAULT_REGION
 };
 
+const hibernateRaw = app.node.tryGetContext('hibernate') ?? process.env.HIBERNATE ?? 'false';
+const hibernate = ['1', 'true', 'yes'].includes(String(hibernateRaw).toLowerCase());
+
 const authStack = new AuthStack(app, 'RagReadinessAuthStack', { env });
 const storageStack = new StorageStack(app, 'RagReadinessStorageStack', { env });
-const postgresVectorStack = new PostgresVectorStack(app, 'RagReadyPostgresVectorStack', { env });
-const pipelineStack = new PipelineStack(app, 'RagReadinessPipelineStack', {
-  env,
-  storage: storageStack,
-  postgresVector: postgresVectorStack
-});
-const apiStack = new ApiStack(app, 'RagReadinessApiStack', {
-  env,
-  auth: authStack,
-  storage: storageStack,
-  postgresVector: postgresVectorStack
-});
 new FrontendStack(app, 'RagReadinessFrontendStack', { env });
 
-apiStack.addDependency(authStack);
-apiStack.addDependency(storageStack);
+if (!hibernate) {
+  const postgresVectorStack = new PostgresVectorStack(app, 'RagReadyPostgresVectorStack', { env });
+  const pipelineStack = new PipelineStack(app, 'RagReadinessPipelineStack', {
+    env,
+    storage: storageStack,
+    postgresVector: postgresVectorStack
+  });
+  const apiStack = new ApiStack(app, 'RagReadinessApiStack', {
+    env,
+    auth: authStack,
+    storage: storageStack,
+    postgresVector: postgresVectorStack
+  });
 
-pipelineStack.addDependency(storageStack);
-pipelineStack.addDependency(authStack);
-pipelineStack.addDependency(postgresVectorStack);
-
-apiStack.addDependency(postgresVectorStack);
+  apiStack.addDependency(authStack);
+  apiStack.addDependency(storageStack);
+  pipelineStack.addDependency(storageStack);
+  pipelineStack.addDependency(authStack);
+  pipelineStack.addDependency(postgresVectorStack);
+  apiStack.addDependency(postgresVectorStack);
+}

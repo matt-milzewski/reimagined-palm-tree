@@ -1,0 +1,36 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "7c48459c76681d9eb22b1024cdc8282a29d2a7871511b97d769320ce1474c4f6": {
+      "displayName": "ApiHandler/Code",
+      "source": {
+        "path": "/Users/mattmilzewski/reimagined-palm-tree/reimagined-palm-tree/infra",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "622842579488-ap-southeast-2-ee7c08a3": {
+          "bucketName": "cdk-hnb659fds-assets-622842579488-ap-southeast-2",
+          "objectKey": "7c48459c76681d9eb22b1024cdc8282a29d2a7871511b97d769320ce1474c4f6.zip",
+          "region": "ap-southeast-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::622842579488:role/cdk-hnb659fds-file-publishing-role-622842579488-ap-southeast-2"
+        }
+      }
+    },
+    "35a02e443a0e45897f6406d483f92edf8db987962138450444e2c36a0dee27f7": {
+      "displayName": "RagReadinessApiStack Template",
+      "source": {
+        "path": "RagReadinessApiStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "622842579488-ap-southeast-2-029636d8": {
+          "bucketName": "cdk-hnb659fds-assets-622842579488-ap-southeast-2",
+          "objectKey": "35a02e443a0e45897f6406d483f92edf8db987962138450444e2c36a0dee27f7.json",
+          "region": "ap-southeast-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::622842579488:role/cdk-hnb659fds-file-publishing-role-622842579488-ap-southeast-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

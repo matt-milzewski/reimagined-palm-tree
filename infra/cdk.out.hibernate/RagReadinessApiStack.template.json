@@ -1,0 +1,1265 @@
+{
+ "Resources": {
+  "ApiHandlerServiceRole592E70E9": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/ApiHandler/ServiceRole/Resource"
+   }
+  },
+  "ApiHandlerServiceRoleDefaultPolicy10321D87": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttDatasetsTableF4ECB6D5Arn636FCA4F"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttDatasetsTableF4ECB6D5Arn636FCA4F"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttFilesTable1399FAA4Arn25DD9DF2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttFilesTable1399FAA4Arn25DD9DF2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttFilesTable1399FAA4Arn25DD9DF2"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttFilesTable1399FAA4Arn25DD9DF2"
+           },
+           "/index/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttJobsTable1970BC16ArnC40C1624"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttJobsTable1970BC16ArnC40C1624"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttAuditTableB07F8EEBArn953CD61D"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttAuditTableB07F8EEBArn953CD61D"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttConversationsTableCD91EB96Arn4A2B28C6"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttConversationsTableCD91EB96Arn4A2B28C6"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttMessagesTable05B58A27Arn05106AA2"
+       }
+      },
+      {
+       "Action": [
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttMessagesTable05B58A27Arn05106AA2"
+       }
+      },
+      {
+       "Action": [
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttRawBucket0C3EE094ArnD2F95F99"
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttRawBucket0C3EE094ArnD2F95F99"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttRawBucket0C3EE094ArnD2F95F99"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttProcessedBucketDE59930CArn662A1615"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttProcessedBucketDE59930CArn662A1615"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:DeleteObject*",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttRawBucket0C3EE094ArnD2F95F99"
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "s3:DeleteObject*",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputFnGetAttProcessedBucketDE59930CArn662A1615"
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:ses:ap-southeast-2:622842579488:identity/mattmilzewski@gmail.com",
+        "arn:aws:ses:ap-southeast-2:622842579488:configuration-set/*"
+       ]
+      },
+      {
+       "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.titan-embed-text-v2:0"
+      },
+      {
+       "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:bedrock:ap-southeast-2::foundation-model/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:ap-southeast-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:ap-southeast-2:622842579488:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:ap-southeast-2:622842579488:inference-profile/*",
+        "arn:aws:bedrock:*::foundation-model/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:*:622842579488:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:*:622842579488:inference-profile/*"
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "RagReadyPostgresVectorStack:ExportsOutputRefRdsCredentials9FB39D528C70F7D9"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ApiHandlerServiceRoleDefaultPolicy10321D87",
+    "Roles": [
+     {
+      "Ref": "ApiHandlerServiceRole592E70E9"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/ApiHandler/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "ApiHandler5E7490E8": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-622842579488-ap-southeast-2",
+     "S3Key": "7c48459c76681d9eb22b1024cdc8282a29d2a7871511b97d769320ce1474c4f6.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "DATASETS_TABLE": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefDatasetsTableF4ECB6D52C57FEC9"
+      },
+      "FILES_TABLE": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefFilesTable1399FAA4592580B8"
+      },
+      "JOBS_TABLE": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefJobsTable1970BC16EDB4A824"
+      },
+      "AUDIT_TABLE": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefAuditTableB07F8EEB58E4840A"
+      },
+      "CONVERSATIONS_TABLE": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefConversationsTableCD91EB96EE2E4585"
+      },
+      "MESSAGES_TABLE": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefMessagesTable05B58A27CCC43D33"
+      },
+      "RAW_BUCKET": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefRawBucket0C3EE094D6333DF9"
+      },
+      "PROCESSED_BUCKET": {
+       "Fn::ImportValue": "RagReadinessStorageStack:ExportsOutputRefProcessedBucketDE59930C4CEBF45D"
+      },
+      "CONTACT_RECIPIENT_EMAIL": "mattmilzewski@gmail.com",
+      "CONTACT_FROM_EMAIL": "mattmilzewski@gmail.com",
+      "DB_HOST": {
+       "Fn::ImportValue": "RagReadyPostgresVectorStack:ExportsOutputFnGetAttPostgresInstance19CDD68AEndpointAddress2796CEED"
+      },
+      "DB_PORT": {
+       "Fn::ImportValue": "RagReadyPostgresVectorStack:ExportsOutputFnGetAttPostgresInstance19CDD68AEndpointPortDAC780AA"
+      },
+      "DB_NAME": "ragready",
+      "DB_SECRET_ARN": {
+       "Fn::ImportValue": "RagReadyPostgresVectorStack:ExportsOutputRefRdsCredentials9FB39D528C70F7D9"
+      },
+      "BEDROCK_EMBED_MODEL_ID": "amazon.titan-embed-text-v2:0",
+      "BEDROCK_CHAT_MODEL_ID": "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "EMBEDDING_DIMENSION": "1024",
+      "CHAT_TOP_K_DEFAULT": "8"
+     }
+    },
+    "Handler": "index.handler",
+    "MemorySize": 512,
+    "Role": {
+     "Fn::GetAtt": [
+      "ApiHandlerServiceRole592E70E9",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs18.x",
+    "Timeout": 60,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::ImportValue": "RagReadyPostgresVectorStack:ExportsOutputFnGetAttLambdaSecurityGroup0BD9FC99GroupId34A98CFB"
+      }
+     ],
+     "SubnetIds": [
+      "subnet-d962c7bf",
+      "subnet-fab066b2",
+      "subnet-2ed48076"
+     ]
+    }
+   },
+   "DependsOn": [
+    "ApiHandlerServiceRoleDefaultPolicy10321D87",
+    "ApiHandlerServiceRole592E70E9"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/ApiHandler/Resource",
+    "aws:asset:path": "/Users/mattmilzewski/reimagined-palm-tree/reimagined-palm-tree/infra",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "RagReadinessApiA276BF47": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Name": "RagReady API"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Resource"
+   }
+  },
+  "RagReadinessApiCloudWatchRole9416DBD5": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+       ]
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/CloudWatchRole/Resource"
+   }
+  },
+  "RagReadinessApiAccount26487A39": {
+   "Type": "AWS::ApiGateway::Account",
+   "Properties": {
+    "CloudWatchRoleArn": {
+     "Fn::GetAtt": [
+      "RagReadinessApiCloudWatchRole9416DBD5",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "RagReadinessApiA276BF47"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Account"
+   }
+  },
+  "RagReadinessApiDeploymentD2B8C85D38ef4bdc80d479f564de97ed5bdb26e7": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "Automatically created by the RestApi construct",
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "DependsOn": [
+    "RagReadinessApiproxyANYCFBF4CD0",
+    "RagReadinessApiproxyOPTIONS5BF765D8",
+    "RagReadinessApiproxyF4A5A7D0",
+    "RagReadinessApiANY8EF515F7",
+    "RagReadinessApiOPTIONS7BBE368D",
+    "RagReadinessApipubliccontactOPTIONS5AA65C55",
+    "RagReadinessApipubliccontactPOSTDF99F3C9",
+    "RagReadinessApipubliccontact44FB7F6E",
+    "RagReadinessApipublicOPTIONS62FCED58",
+    "RagReadinessApipublic9AACBFA7"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "RagReadinessApiDeploymentStageprodFE26D59F": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "RagReadinessApiDeploymentD2B8C85D38ef4bdc80d479f564de97ed5bdb26e7"
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    },
+    "StageName": "prod"
+   },
+   "DependsOn": [
+    "RagReadinessApiAccount26487A39"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/DeploymentStage.prod/Resource"
+   }
+  },
+  "RagReadinessApiOPTIONS7BBE368D": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Authorization,Content-Type'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,DELETE,OPTIONS'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "RagReadinessApiA276BF47",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/OPTIONS/Resource"
+   }
+  },
+  "RagReadinessApiproxyF4A5A7D0": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "RagReadinessApiA276BF47",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "{proxy+}",
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/{proxy+}/Resource"
+   }
+  },
+  "RagReadinessApiproxyOPTIONS5BF765D8": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Authorization,Content-Type'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,DELETE,OPTIONS'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RagReadinessApiproxyF4A5A7D0"
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/{proxy+}/OPTIONS/Resource"
+   }
+  },
+  "RagReadinessApiproxyANYApiPermissionRagReadinessApiStackRagReadinessApiDDF8F837ANYproxy41842C36": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiHandler5E7490E8",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:ap-southeast-2:622842579488:",
+       {
+        "Ref": "RagReadinessApiA276BF47"
+       },
+       "/",
+       {
+        "Ref": "RagReadinessApiDeploymentStageprodFE26D59F"
+       },
+       "/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/{proxy+}/ANY/ApiPermission.RagReadinessApiStackRagReadinessApiDDF8F837.ANY..{proxy+}"
+   }
+  },
+  "RagReadinessApiproxyANYApiPermissionTestRagReadinessApiStackRagReadinessApiDDF8F837ANYproxy20DF3891": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiHandler5E7490E8",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:ap-southeast-2:622842579488:",
+       {
+        "Ref": "RagReadinessApiA276BF47"
+       },
+       "/test-invoke-stage/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/{proxy+}/ANY/ApiPermission.Test.RagReadinessApiStackRagReadinessApiDDF8F837.ANY..{proxy+}"
+   }
+  },
+  "RagReadinessApiproxyANYCFBF4CD0": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "COGNITO_USER_POOLS",
+    "AuthorizerId": {
+     "Ref": "UserPoolAuthorizer2F68B0CA"
+    },
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ApiHandler5E7490E8",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RagReadinessApiproxyF4A5A7D0"
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/{proxy+}/ANY/Resource"
+   }
+  },
+  "RagReadinessApiANYApiPermissionRagReadinessApiStackRagReadinessApiDDF8F837ANY71D3363D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiHandler5E7490E8",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:ap-southeast-2:622842579488:",
+       {
+        "Ref": "RagReadinessApiA276BF47"
+       },
+       "/",
+       {
+        "Ref": "RagReadinessApiDeploymentStageprodFE26D59F"
+       },
+       "/*/"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/ANY/ApiPermission.RagReadinessApiStackRagReadinessApiDDF8F837.ANY.."
+   }
+  },
+  "RagReadinessApiANYApiPermissionTestRagReadinessApiStackRagReadinessApiDDF8F837ANYBE656E40": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiHandler5E7490E8",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:ap-southeast-2:622842579488:",
+       {
+        "Ref": "RagReadinessApiA276BF47"
+       },
+       "/test-invoke-stage/*/"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/ANY/ApiPermission.Test.RagReadinessApiStackRagReadinessApiDDF8F837.ANY.."
+   }
+  },
+  "RagReadinessApiANY8EF515F7": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "COGNITO_USER_POOLS",
+    "AuthorizerId": {
+     "Ref": "UserPoolAuthorizer2F68B0CA"
+    },
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ApiHandler5E7490E8",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "RagReadinessApiA276BF47",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/ANY/Resource"
+   }
+  },
+  "RagReadinessApipublic9AACBFA7": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "RagReadinessApiA276BF47",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "public",
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/Resource"
+   }
+  },
+  "RagReadinessApipublicOPTIONS62FCED58": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Authorization,Content-Type'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,DELETE,OPTIONS'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RagReadinessApipublic9AACBFA7"
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/OPTIONS/Resource"
+   }
+  },
+  "RagReadinessApipubliccontact44FB7F6E": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "RagReadinessApipublic9AACBFA7"
+    },
+    "PathPart": "contact",
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/contact/Resource"
+   }
+  },
+  "RagReadinessApipubliccontactOPTIONS5AA65C55": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Authorization,Content-Type'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,DELETE,OPTIONS'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "RagReadinessApipubliccontact44FB7F6E"
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/contact/OPTIONS/Resource"
+   }
+  },
+  "RagReadinessApipubliccontactPOSTApiPermissionRagReadinessApiStackRagReadinessApiDDF8F837POSTpubliccontactC08619F1": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiHandler5E7490E8",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:ap-southeast-2:622842579488:",
+       {
+        "Ref": "RagReadinessApiA276BF47"
+       },
+       "/",
+       {
+        "Ref": "RagReadinessApiDeploymentStageprodFE26D59F"
+       },
+       "/POST/public/contact"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/contact/POST/ApiPermission.RagReadinessApiStackRagReadinessApiDDF8F837.POST..public.contact"
+   }
+  },
+  "RagReadinessApipubliccontactPOSTApiPermissionTestRagReadinessApiStackRagReadinessApiDDF8F837POSTpubliccontact9C32ADFB": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiHandler5E7490E8",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:ap-southeast-2:622842579488:",
+       {
+        "Ref": "RagReadinessApiA276BF47"
+       },
+       "/test-invoke-stage/POST/public/contact"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/contact/POST/ApiPermission.Test.RagReadinessApiStackRagReadinessApiDDF8F837.POST..public.contact"
+   }
+  },
+  "RagReadinessApipubliccontactPOSTDF99F3C9": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "ApiHandler5E7490E8",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "RagReadinessApipubliccontact44FB7F6E"
+    },
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/RagReadinessApi/Default/public/contact/POST/Resource"
+   }
+  },
+  "UserPoolAuthorizer2F68B0CA": {
+   "Type": "AWS::ApiGateway::Authorizer",
+   "Properties": {
+    "IdentitySource": "method.request.header.Authorization",
+    "Name": "RagReadinessApiStackUserPoolAuthorizer0CADD304",
+    "ProviderARNs": [
+     {
+      "Fn::ImportValue": "RagReadinessAuthStack:ExportsOutputFnGetAttUserPool6BA7E5F2Arn686ACC00"
+     }
+    ],
+    "RestApiId": {
+     "Ref": "RagReadinessApiA276BF47"
+    },
+    "Type": "COGNITO_USER_POOLS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/UserPoolAuthorizer/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/01QwW7CMAz9Fu4hY+2knQvTbtuqop1RSE0xtHEVO2Nd1X+fkjLY6b3n2H7PyXSWP+nVwlx4aevzssW9Hrdi7FmZC+/G1nT72uwc1XBi/Z7gNTgrSE6h6fRYUQtqc3AJS2rRDlHObFKc7wwzCOsiguJcr4M9g6wNg5rX63FzcLetcRh8h8xIblKmx8YIXMygxwpYih6T3Z0W1lJwol6gb2nowEms/lNbMU3KOJMKmIK3kBK8gRypjo9XVnr6Hv5ark4zvxepcSj0yeBLopaLIEfy+AM+xbmpabrPpOujP7omdn0E6YNMKv6sPvHDV5bpx2e9WpwYcemDE+xAVzP+AsYwxEWmAQAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessApiStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "RagReadinessApiEndpointD159EF8D": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "RagReadinessApiA276BF47"
+      },
+      ".execute-api.ap-southeast-2.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "RagReadinessApiDeploymentStageprodFE26D59F"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "ApiUrl": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "RagReadinessApiA276BF47"
+      },
+      ".execute-api.ap-southeast-2.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "RagReadinessApiDeploymentStageprodFE26D59F"
+      },
+      "/"
+     ]
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

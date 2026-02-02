@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "f4bc9c3942b3d81dd1911b707b4831f7c553f69b2b133c7fde0056c98144b4f9": {
+      "displayName": "RagReadinessAuthStack Template",
+      "source": {
+        "path": "RagReadinessAuthStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "622842579488-ap-southeast-2-605633d3": {
+          "bucketName": "cdk-hnb659fds-assets-622842579488-ap-southeast-2",
+          "objectKey": "f4bc9c3942b3d81dd1911b707b4831f7c553f69b2b133c7fde0056c98144b4f9.json",
+          "region": "ap-southeast-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::622842579488:role/cdk-hnb659fds-file-publishing-role-622842579488-ap-southeast-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

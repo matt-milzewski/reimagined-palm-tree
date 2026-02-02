@@ -1,0 +1,893 @@
+{
+ "Resources": {
+  "RawBucket0C3EE094": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "CorsConfiguration": {
+     "CorsRules": [
+      {
+       "AllowedHeaders": [
+        "*"
+       ],
+       "AllowedMethods": [
+        "PUT",
+        "POST",
+        "GET",
+        "HEAD"
+       ],
+       "AllowedOrigins": [
+        "*"
+       ],
+       "ExposedHeaders": [
+        "ETag"
+       ]
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/RawBucket/Resource"
+   }
+  },
+  "RawBucketPolicy61C50A52": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "RawBucket0C3EE094"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "RawBucket0C3EE094",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "RawBucket0C3EE094",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:GetObject",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": "622842579488"
+        },
+        "ArnLike": {
+         "aws:SourceArn": "arn:aws:textract:ap-southeast-2:622842579488:*"
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "textract.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "RawBucket0C3EE094",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       },
+       "Sid": "AllowTextractRead"
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/RawBucket/Policy/Resource"
+   }
+  },
+  "RawBucketNotificationsAC3090B1": {
+   "Type": "Custom::S3BucketNotifications",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "RawBucket0C3EE094"
+    },
+    "NotificationConfiguration": {
+     "QueueConfigurations": [
+      {
+       "Events": [
+        "s3:ObjectCreated:Put"
+       ],
+       "QueueArn": {
+        "Fn::GetAtt": [
+         "IngestionQueue9CC91140",
+         "Arn"
+        ]
+       }
+      }
+     ]
+    },
+    "Managed": true,
+    "SkipDestinationValidation": false
+   },
+   "DependsOn": [
+    "IngestionQueuePolicy6E8FFD74",
+    "IngestionQueue9CC91140",
+    "RawBucketPolicy61C50A52"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/RawBucket/Notifications/Resource"
+   }
+  },
+  "ProcessedBucketDE59930C": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/ProcessedBucket/Resource"
+   }
+  },
+  "ProcessedBucketPolicyAB48A58F": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "ProcessedBucketDE59930C"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ProcessedBucketDE59930C",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ProcessedBucketDE59930C",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/ProcessedBucket/Policy/Resource"
+   }
+  },
+  "IngestionDLQF0F102AE": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "MessageRetentionPeriod": 1209600
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/IngestionDLQ/Resource"
+   }
+  },
+  "IngestionQueue9CC91140": {
+   "Type": "AWS::SQS::Queue",
+   "Properties": {
+    "RedrivePolicy": {
+     "deadLetterTargetArn": {
+      "Fn::GetAtt": [
+       "IngestionDLQF0F102AE",
+       "Arn"
+      ]
+     },
+     "maxReceiveCount": 3
+    },
+    "VisibilityTimeout": 300
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/IngestionQueue/Resource"
+   }
+  },
+  "IngestionQueuePolicy6E8FFD74": {
+   "Type": "AWS::SQS::QueuePolicy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "sqs:SendMessage",
+        "sqs:GetQueueAttributes",
+        "sqs:GetQueueUrl"
+       ],
+       "Condition": {
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::GetAtt": [
+           "RawBucket0C3EE094",
+           "Arn"
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "s3.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::GetAtt": [
+         "IngestionQueue9CC91140",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Queues": [
+     {
+      "Ref": "IngestionQueue9CC91140"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/IngestionQueue/Policy/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:PutBucketNotification",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "RawBucket0C3EE094",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
+    "Roles": [
+     {
+      "Ref": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/DefaultPolicy/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Description": "AWS CloudFormation handler for \"Custom::S3BucketNotifications\" resources (@aws-cdk/aws-s3)",
+    "Code": {
+     "ZipFile": "import boto3  # type: ignore\nimport json\nimport logging\nimport urllib.request\n\ns3 = boto3.client(\"s3\")\n\nEVENTBRIDGE_CONFIGURATION = 'EventBridgeConfiguration'\nCONFIGURATION_TYPES = [\"TopicConfigurations\", \"QueueConfigurations\", \"LambdaFunctionConfigurations\"]\n\ndef handler(event: dict, context):\n  response_status = \"SUCCESS\"\n  error_message = \"\"\n  try:\n    props = event[\"ResourceProperties\"]\n    notification_configuration = props[\"NotificationConfiguration\"]\n    managed = props.get('Managed', 'true').lower() == 'true'\n    skipDestinationValidation = props.get('SkipDestinationValidation', 'false').lower() == 'true'\n    stack_id = event['StackId']\n    old = event.get(\"OldResourceProperties\", {}).get(\"NotificationConfiguration\", {})\n    if managed:\n      config = handle_managed(event[\"RequestType\"], notification_configuration)\n    else:\n      config = handle_unmanaged(props[\"BucketName\"], stack_id, event[\"RequestType\"], notification_configuration, old)\n    s3.put_bucket_notification_configuration(Bucket=props[\"BucketName\"], NotificationConfiguration=config, SkipDestinationValidation=skipDestinationValidation)\n  except Exception as e:\n    logging.exception(\"Failed to put bucket notification configuration\")\n    response_status = \"FAILED\"\n    error_message = f\"Error: {str(e)}. \"\n  finally:\n    submit_response(event, context, response_status, error_message)\n\ndef handle_managed(request_type, notification_configuration):\n  if request_type == 'Delete':\n    return {}\n  return notification_configuration\n\ndef handle_unmanaged(bucket, stack_id, request_type, notification_configuration, old):\n  def get_id(n):\n    n['Id'] = ''\n    sorted_notifications = sort_filter_rules(n)\n    strToHash=json.dumps(sorted_notifications, sort_keys=True).replace('\"Name\": \"prefix\"', '\"Name\": \"Prefix\"').replace('\"Name\": \"suffix\"', '\"Name\": \"Suffix\"')\n    return f\"{stack_id}-{hash(strToHash)}\"\n  def with_id(n):\n    n['Id'] = get_id(n)\n    return n\n\n  external_notifications = {}\n  existing_notifications = s3.get_bucket_notification_configuration(Bucket=bucket)\n  for t in CONFIGURATION_TYPES:\n    if request_type == 'Update':\n        old_incoming_ids = [get_id(n) for n in old.get(t, [])]\n        external_notifications[t] = [n for n in existing_notifications.get(t, []) if not get_id(n) in old_incoming_ids]      \n    elif request_type == 'Delete':\n        external_notifications[t] = [n for n in existing_notifications.get(t, []) if not n['Id'].startswith(f\"{stack_id}-\")]\n    elif request_type == 'Create':\n        external_notifications[t] = [n for n in existing_notifications.get(t, [])]\n  if EVENTBRIDGE_CONFIGURATION in existing_notifications:\n    external_notifications[EVENTBRIDGE_CONFIGURATION] = existing_notifications[EVENTBRIDGE_CONFIGURATION]\n\n  if request_type == 'Delete':\n    return external_notifications\n\n  notifications = {}\n  for t in CONFIGURATION_TYPES:\n    external = external_notifications.get(t, [])\n    incoming = [with_id(n) for n in notification_configuration.get(t, [])]\n    notifications[t] = external + incoming\n\n  if EVENTBRIDGE_CONFIGURATION in notification_configuration:\n    notifications[EVENTBRIDGE_CONFIGURATION] = notification_configuration[EVENTBRIDGE_CONFIGURATION]\n  elif EVENTBRIDGE_CONFIGURATION in external_notifications:\n    notifications[EVENTBRIDGE_CONFIGURATION] = external_notifications[EVENTBRIDGE_CONFIGURATION]\n\n  return notifications\n\ndef submit_response(event: dict, context, response_status: str, error_message: str):\n  response_body = json.dumps(\n    {\n      \"Status\": response_status,\n      \"Reason\": f\"{error_message}See the details in CloudWatch Log Stream: {context.log_stream_name}\",\n      \"PhysicalResourceId\": event.get(\"PhysicalResourceId\") or event[\"LogicalResourceId\"],\n      \"StackId\": event[\"StackId\"],\n      \"RequestId\": event[\"RequestId\"],\n      \"LogicalResourceId\": event[\"LogicalResourceId\"],\n      \"NoEcho\": False,\n    }\n  ).encode(\"utf-8\")\n  headers = {\"content-type\": \"\", \"content-length\": str(len(response_body))}\n  try:\n    req = urllib.request.Request(url=event[\"ResponseURL\"], headers=headers, data=response_body, method=\"PUT\")\n    with urllib.request.urlopen(req) as response:\n      print(response.read().decode(\"utf-8\"))\n    print(\"Status code: \" + response.reason)\n  except Exception as e:\n      print(\"send(..) failed executing request.urlopen(..): \" + str(e))\n\ndef sort_filter_rules(json_obj):\n  if not isinstance(json_obj, dict):\n      return json_obj\n  for key, value in json_obj.items():\n      if isinstance(value, dict):\n          json_obj[key] = sort_filter_rules(value)\n      elif isinstance(value, list):\n          json_obj[key] = [sort_filter_rules(item) for item in value]\n  if \"Filter\" in json_obj and \"Key\" in json_obj[\"Filter\"] and \"FilterRules\" in json_obj[\"Filter\"][\"Key\"]:\n      filter_rules = json_obj[\"Filter\"][\"Key\"][\"FilterRules\"]\n      sorted_filter_rules = sorted(filter_rules, key=lambda x: x[\"Name\"])\n      json_obj[\"Filter\"][\"Key\"][\"FilterRules\"] = sorted_filter_rules\n  return json_obj"
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.13",
+    "Timeout": 300
+   },
+   "DependsOn": [
+    "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
+    "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Resource"
+   }
+  },
+  "DatasetsTableF4ECB6D5": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "tenantId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "datasetId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "tenantId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "datasetId",
+      "KeyType": "RANGE"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/DatasetsTable/Resource"
+   }
+  },
+  "FilesTable1399FAA4": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "tenantDatasetId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "fileId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "tenantId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "rawSha256",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "rawSha256-index",
+      "KeySchema": [
+       {
+        "AttributeName": "tenantId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "rawSha256",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "tenantCreatedAt-index",
+      "KeySchema": [
+       {
+        "AttributeName": "tenantId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "tenantDatasetId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "fileId",
+      "KeyType": "RANGE"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/FilesTable/Resource"
+   }
+  },
+  "JobsTable1970BC16": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "tenantFileId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "jobId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "tenantFileId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "jobId",
+      "KeyType": "RANGE"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/JobsTable/Resource"
+   }
+  },
+  "AuditTableB07F8EEB": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "tenantId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAtEventId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "tenantId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "createdAtEventId",
+      "KeyType": "RANGE"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/AuditTable/Resource"
+   }
+  },
+  "ConversationsTableCD91EB96": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "tenantId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "conversationId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "tenantId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "conversationId",
+      "KeyType": "RANGE"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/ConversationsTable/Resource"
+   }
+  },
+  "MessagesTable05B58A27": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "tenantConversationId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAtMessageId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "KeySchema": [
+     {
+      "AttributeName": "tenantConversationId",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "createdAtMessageId",
+      "KeyType": "RANGE"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/MessagesTable/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02Lyw7CIBBFv6V7OlZq4t5+gFrdGwo0oQ/QDtg0hH83glo3c8+dOUOBljsoMjZjzkWfD6oBf7GM94TNePNYgj843ktLqlZ/KMXJDIov6zr1QPCB4M9OOvm+JYhzffirgSg2gq/NEPWYq/h1xKLZaEQD/sqaZEYIIT5JNG7ikvygavXR2buzgWgjJHS4eVIK2z0UWYdK5ZPTVo0S6pQvUH+RwQcBAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadinessStorageStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "RawBucketName": {
+   "Value": {
+    "Ref": "RawBucket0C3EE094"
+   }
+  },
+  "ProcessedBucketName": {
+   "Value": {
+    "Ref": "ProcessedBucketDE59930C"
+   }
+  },
+  "IngestionQueueUrl": {
+   "Value": {
+    "Ref": "IngestionQueue9CC91140"
+   }
+  },
+  "DatasetsTableName": {
+   "Value": {
+    "Ref": "DatasetsTableF4ECB6D5"
+   }
+  },
+  "FilesTableName": {
+   "Value": {
+    "Ref": "FilesTable1399FAA4"
+   }
+  },
+  "JobsTableName": {
+   "Value": {
+    "Ref": "JobsTable1970BC16"
+   }
+  },
+  "AuditTableName": {
+   "Value": {
+    "Ref": "AuditTableB07F8EEB"
+   }
+  },
+  "ConversationsTableName": {
+   "Value": {
+    "Ref": "ConversationsTableCD91EB96"
+   }
+  },
+  "MessagesTableName": {
+   "Value": {
+    "Ref": "MessagesTable05B58A27"
+   }
+  },
+  "ExportsOutputFnGetAttFilesTable1399FAA4Arn25DD9DF2": {
+   "Value": {
+    "Fn::GetAtt": [
+     "FilesTable1399FAA4",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttFilesTable1399FAA4Arn25DD9DF2"
+   }
+  },
+  "ExportsOutputFnGetAttJobsTable1970BC16ArnC40C1624": {
+   "Value": {
+    "Fn::GetAtt": [
+     "JobsTable1970BC16",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttJobsTable1970BC16ArnC40C1624"
+   }
+  },
+  "ExportsOutputFnGetAttAuditTableB07F8EEBArn953CD61D": {
+   "Value": {
+    "Fn::GetAtt": [
+     "AuditTableB07F8EEB",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttAuditTableB07F8EEBArn953CD61D"
+   }
+  },
+  "ExportsOutputRefRawBucket0C3EE094D6333DF9": {
+   "Value": {
+    "Ref": "RawBucket0C3EE094"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefRawBucket0C3EE094D6333DF9"
+   }
+  },
+  "ExportsOutputRefProcessedBucketDE59930C4CEBF45D": {
+   "Value": {
+    "Ref": "ProcessedBucketDE59930C"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefProcessedBucketDE59930C4CEBF45D"
+   }
+  },
+  "ExportsOutputRefFilesTable1399FAA4592580B8": {
+   "Value": {
+    "Ref": "FilesTable1399FAA4"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefFilesTable1399FAA4592580B8"
+   }
+  },
+  "ExportsOutputRefJobsTable1970BC16EDB4A824": {
+   "Value": {
+    "Ref": "JobsTable1970BC16"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefJobsTable1970BC16EDB4A824"
+   }
+  },
+  "ExportsOutputRefDatasetsTableF4ECB6D52C57FEC9": {
+   "Value": {
+    "Ref": "DatasetsTableF4ECB6D5"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefDatasetsTableF4ECB6D52C57FEC9"
+   }
+  },
+  "ExportsOutputRefAuditTableB07F8EEB58E4840A": {
+   "Value": {
+    "Ref": "AuditTableB07F8EEB"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefAuditTableB07F8EEB58E4840A"
+   }
+  },
+  "ExportsOutputFnGetAttRawBucket0C3EE094ArnD2F95F99": {
+   "Value": {
+    "Fn::GetAtt": [
+     "RawBucket0C3EE094",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttRawBucket0C3EE094ArnD2F95F99"
+   }
+  },
+  "ExportsOutputFnGetAttProcessedBucketDE59930CArn662A1615": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ProcessedBucketDE59930C",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttProcessedBucketDE59930CArn662A1615"
+   }
+  },
+  "ExportsOutputFnGetAttDatasetsTableF4ECB6D5Arn636FCA4F": {
+   "Value": {
+    "Fn::GetAtt": [
+     "DatasetsTableF4ECB6D5",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttDatasetsTableF4ECB6D5Arn636FCA4F"
+   }
+  },
+  "ExportsOutputFnGetAttIngestionQueue9CC91140Arn7615285A": {
+   "Value": {
+    "Fn::GetAtt": [
+     "IngestionQueue9CC91140",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttIngestionQueue9CC91140Arn7615285A"
+   }
+  },
+  "ExportsOutputFnGetAttConversationsTableCD91EB96Arn4A2B28C6": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ConversationsTableCD91EB96",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttConversationsTableCD91EB96Arn4A2B28C6"
+   }
+  },
+  "ExportsOutputFnGetAttMessagesTable05B58A27Arn05106AA2": {
+   "Value": {
+    "Fn::GetAtt": [
+     "MessagesTable05B58A27",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputFnGetAttMessagesTable05B58A27Arn05106AA2"
+   }
+  },
+  "ExportsOutputRefConversationsTableCD91EB96EE2E4585": {
+   "Value": {
+    "Ref": "ConversationsTableCD91EB96"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefConversationsTableCD91EB96EE2E4585"
+   }
+  },
+  "ExportsOutputRefMessagesTable05B58A27CCC43D33": {
+   "Value": {
+    "Ref": "MessagesTable05B58A27"
+   },
+   "Export": {
+    "Name": "RagReadinessStorageStack:ExportsOutputRefMessagesTable05B58A27CCC43D33"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

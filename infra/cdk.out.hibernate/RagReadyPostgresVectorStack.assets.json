@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "10d429c2a506f1fe798751f35d27a82ff756b769693e3a7a5851b09b2e8a7d4b": {
+      "displayName": "RagReadyPostgresVectorStack Template",
+      "source": {
+        "path": "RagReadyPostgresVectorStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "622842579488-ap-southeast-2-1ff4e342": {
+          "bucketName": "cdk-hnb659fds-assets-622842579488-ap-southeast-2",
+          "objectKey": "10d429c2a506f1fe798751f35d27a82ff756b769693e3a7a5851b09b2e8a7d4b.json",
+          "region": "ap-southeast-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::622842579488:role/cdk-hnb659fds-file-publishing-role-622842579488-ap-southeast-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

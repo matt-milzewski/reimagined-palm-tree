@@ -1,0 +1,717 @@
+{
+ "Resources": {
+  "DefaultVpcS3GatewayEndpoint5372DFA8": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "RouteTableIds": [
+     "rtb-2eaaed48"
+    ],
+    "ServiceName": {
+     "Fn::Join": [
+      "",
+      [
+       "com.amazonaws.",
+       {
+        "Ref": "AWS::Region"
+       },
+       ".s3"
+      ]
+     ]
+    },
+    "VpcEndpointType": "Gateway",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/S3GatewayEndpoint/Resource"
+   }
+  },
+  "DefaultVpcDynamoDbGatewayEndpoint24BBD184": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "RouteTableIds": [
+     "rtb-2eaaed48"
+    ],
+    "ServiceName": {
+     "Fn::Join": [
+      "",
+      [
+       "com.amazonaws.",
+       {
+        "Ref": "AWS::Region"
+       },
+       ".dynamodb"
+      ]
+     ]
+    },
+    "VpcEndpointType": "Gateway",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/DynamoDbGatewayEndpoint/Resource"
+   }
+  },
+  "DefaultVpcSecretsManagerEndpointSecurityGroupE273AA4E": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/SecretsManagerEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/SecretsManagerEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcSecretsManagerEndpoint13E23E82": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcSecretsManagerEndpointSecurityGroupE273AA4E",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.secretsmanager",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/SecretsManagerEndpoint/Resource"
+   }
+  },
+  "DefaultVpcCloudWatchLogsEndpointSecurityGroup2591C4B9": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/CloudWatchLogsEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/CloudWatchLogsEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcCloudWatchLogsEndpointD1EF5159": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcCloudWatchLogsEndpointSecurityGroup2591C4B9",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.logs",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/CloudWatchLogsEndpoint/Resource"
+   }
+  },
+  "DefaultVpcCloudWatchMonitoringEndpointSecurityGroupED60DE3E": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/CloudWatchMonitoringEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/CloudWatchMonitoringEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcCloudWatchMonitoringEndpoint8663AC74": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcCloudWatchMonitoringEndpointSecurityGroupED60DE3E",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.monitoring",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/CloudWatchMonitoringEndpoint/Resource"
+   }
+  },
+  "DefaultVpcSqsEndpointSecurityGroup02C7FDC7": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/SqsEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/SqsEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcSqsEndpoint5790497E": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcSqsEndpointSecurityGroup02C7FDC7",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.sqs",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/SqsEndpoint/Resource"
+   }
+  },
+  "DefaultVpcStepFunctionsEndpointSecurityGroupB7AA2DE2": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/StepFunctionsEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/StepFunctionsEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcStepFunctionsEndpoint872863B3": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcStepFunctionsEndpointSecurityGroupB7AA2DE2",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.states",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/StepFunctionsEndpoint/Resource"
+   }
+  },
+  "DefaultVpcBedrockRuntimeEndpointSecurityGroupE09759BA": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/BedrockRuntimeEndpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/BedrockRuntimeEndpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcBedrockRuntimeEndpoint03F17DBE": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcBedrockRuntimeEndpointSecurityGroupE09759BA",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.bedrock-runtime",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/BedrockRuntimeEndpoint/Resource"
+   }
+  },
+  "DefaultVpcSesV2EndpointSecurityGroup670EFB78": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RagReadyPostgresVectorStack/DefaultVpc/SesV2Endpoint/SecurityGroup",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "from 172.31.0.0/16:443",
+      "FromPort": 443,
+      "IpProtocol": "tcp",
+      "ToPort": 443
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/SesV2Endpoint/SecurityGroup/Resource"
+   }
+  },
+  "DefaultVpcSesV2EndpointA3A61852": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "PrivateDnsEnabled": true,
+    "SecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DefaultVpcSesV2EndpointSecurityGroup670EFB78",
+       "GroupId"
+      ]
+     }
+    ],
+    "ServiceName": "com.amazonaws.ap-southeast-2.email",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ],
+    "VpcEndpointType": "Interface",
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/DefaultVpc/SesV2Endpoint/Resource"
+   }
+  },
+  "RdsSecurityGroup632A77E4": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for RagReady PostgreSQL vector database",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "172.31.0.0/16",
+      "Description": "Allow PostgreSQL from VPC",
+      "FromPort": 5432,
+      "IpProtocol": "tcp",
+      "ToPort": 5432
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/RdsSecurityGroup/Resource"
+   }
+  },
+  "RdsSecurityGroupfromRagReadyPostgresVectorStackLambdaSecurityGroup5120087F54323338A8C3": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow PostgreSQL from Lambda",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "RdsSecurityGroup632A77E4",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "LambdaSecurityGroup0BD9FC99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/RdsSecurityGroup/from RagReadyPostgresVectorStackLambdaSecurityGroup5120087F:5432"
+   }
+  },
+  "LambdaSecurityGroup0BD9FC99": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for RagReady Lambda functions",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": "vpc-6025d806"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/LambdaSecurityGroup/Resource"
+   }
+  },
+  "RdsCredentials9FB39D52": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "password",
+     "PasswordLength": 32,
+     "SecretStringTemplate": "{\"username\":\"ragready_admin\"}"
+    },
+    "Name": "ragready-dev-db-credentials"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/RdsCredentials/Resource"
+   }
+  },
+  "RdsCredentialsAttachmentE65E7659": {
+   "Type": "AWS::SecretsManager::SecretTargetAttachment",
+   "Properties": {
+    "SecretId": {
+     "Ref": "RdsCredentials9FB39D52"
+    },
+    "TargetId": {
+     "Ref": "PostgresInstance19CDD68A"
+    },
+    "TargetType": "AWS::RDS::DBInstance"
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/RdsCredentials/Attachment/Resource"
+   }
+  },
+  "PgVectorParamGroupBCE51FF9": {
+   "Type": "AWS::RDS::DBParameterGroup",
+   "Properties": {
+    "Description": "Parameter group for postgres15",
+    "Family": "postgres15",
+    "Parameters": {
+     "shared_preload_libraries": "pg_stat_statements"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/PgVectorParamGroup/Resource"
+   }
+  },
+  "PostgresInstanceSubnetGroup84F90C7C": {
+   "Type": "AWS::RDS::DBSubnetGroup",
+   "Properties": {
+    "DBSubnetGroupDescription": "Subnet group for PostgresInstance database",
+    "SubnetIds": [
+     "subnet-d962c7bf",
+     "subnet-fab066b2",
+     "subnet-2ed48076"
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/PostgresInstance/SubnetGroup/Default"
+   }
+  },
+  "PostgresInstance19CDD68A": {
+   "Type": "AWS::RDS::DBInstance",
+   "Properties": {
+    "AllocatedStorage": "20",
+    "BackupRetentionPeriod": 7,
+    "CopyTagsToSnapshot": true,
+    "DBInstanceClass": "db.t4g.small",
+    "DBInstanceIdentifier": "ragready-dev-vector-db",
+    "DBName": "ragready",
+    "DBParameterGroupName": {
+     "Ref": "PgVectorParamGroupBCE51FF9"
+    },
+    "DBSubnetGroupName": {
+     "Ref": "PostgresInstanceSubnetGroup84F90C7C"
+    },
+    "DeletionProtection": false,
+    "Engine": "postgres",
+    "EngineVersion": "15",
+    "MasterUserPassword": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "RdsCredentials9FB39D52"
+       },
+       ":SecretString:password::}}"
+      ]
+     ]
+    },
+    "MasterUsername": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "RdsCredentials9FB39D52"
+       },
+       ":SecretString:username::}}"
+      ]
+     ]
+    },
+    "MaxAllocatedStorage": 100,
+    "MultiAZ": false,
+    "PubliclyAccessible": true,
+    "StorageEncrypted": true,
+    "StorageType": "gp3",
+    "VPCSecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "RdsSecurityGroup632A77E4",
+       "GroupId"
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Snapshot",
+   "DeletionPolicy": "Snapshot",
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/PostgresInstance/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/32NQU/CQBCFfwv37YqFxLOCIT1JqOFqptuhLthpMzNrQzb7301FSYOJpzfvzffycpsvlnY+g0EyV5+yD1/ZWCq4k9mhdIEdGhjkLaLLbdyA4gDnfe+eqe47T2pWB9pvV1dbkCIfwOGUKdEF9nrecBf6sfF/UFDDKJKMoGNUaYGgQbax/PY//Hhd5BW4QX1UBffeIk2A208yXIuNW2BoUZGv++unm2wNChUIFiQK5NCUoSLUSeFP8IumNPqXoH3QZKir0R7l7jPP7f2Dnc+O4n3GgdS3aHcX/QIaBo14hgEAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "RagReadyPostgresVectorStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "DbEndpoint": {
+   "Value": {
+    "Fn::GetAtt": [
+     "PostgresInstance19CDD68A",
+     "Endpoint.Address"
+    ]
+   }
+  },
+  "DbPort": {
+   "Value": {
+    "Fn::GetAtt": [
+     "PostgresInstance19CDD68A",
+     "Endpoint.Port"
+    ]
+   }
+  },
+  "DbSecretArn": {
+   "Value": {
+    "Ref": "RdsCredentials9FB39D52"
+   }
+  },
+  "DatabaseName": {
+   "Value": "ragready"
+  },
+  "DbSecurityGroupId": {
+   "Value": {
+    "Fn::GetAtt": [
+     "RdsSecurityGroup632A77E4",
+     "GroupId"
+    ]
+   }
+  },
+  "ExportsOutputFnGetAttPostgresInstance19CDD68AEndpointAddress2796CEED": {
+   "Value": {
+    "Fn::GetAtt": [
+     "PostgresInstance19CDD68A",
+     "Endpoint.Address"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadyPostgresVectorStack:ExportsOutputFnGetAttPostgresInstance19CDD68AEndpointAddress2796CEED"
+   }
+  },
+  "ExportsOutputFnGetAttPostgresInstance19CDD68AEndpointPortDAC780AA": {
+   "Value": {
+    "Fn::GetAtt": [
+     "PostgresInstance19CDD68A",
+     "Endpoint.Port"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadyPostgresVectorStack:ExportsOutputFnGetAttPostgresInstance19CDD68AEndpointPortDAC780AA"
+   }
+  },
+  "ExportsOutputRefRdsCredentials9FB39D528C70F7D9": {
+   "Value": {
+    "Ref": "RdsCredentials9FB39D52"
+   },
+   "Export": {
+    "Name": "RagReadyPostgresVectorStack:ExportsOutputRefRdsCredentials9FB39D528C70F7D9"
+   }
+  },
+  "ExportsOutputFnGetAttLambdaSecurityGroup0BD9FC99GroupId34A98CFB": {
+   "Value": {
+    "Fn::GetAtt": [
+     "LambdaSecurityGroup0BD9FC99",
+     "GroupId"
+    ]
+   },
+   "Export": {
+    "Name": "RagReadyPostgresVectorStack:ExportsOutputFnGetAttLambdaSecurityGroup0BD9FC99GroupId34A98CFB"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

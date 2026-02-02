@@ -1,0 +1,21 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "6c33b6f7296779c7029225964458517f6c4ddafeda154fb42c1c0f4bba87f5d4": {
+      "displayName": "RagReadinessStorageStack Template",
+      "source": {
+        "path": "RagReadinessStorageStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "622842579488-ap-southeast-2-cbb2ce16": {
+          "bucketName": "cdk-hnb659fds-assets-622842579488-ap-southeast-2",
+          "objectKey": "6c33b6f7296779c7029225964458517f6c4ddafeda154fb42c1c0f4bba87f5d4.json",
+          "region": "ap-southeast-2",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::622842579488:role/cdk-hnb659fds-file-publishing-role-622842579488-ap-southeast-2"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
